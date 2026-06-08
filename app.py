@@ -56,6 +56,15 @@ class Mpk249App(ctk.CTk):
         self.selected_mapping_key = None  # Key currently selected for editing
         self.selected_canvas_control_id = None # Selected control on the visual schematic
 
+        # Initialize default control values database
+        self.control_values = {}
+        for cc in range(12, 20): self.control_values[f"cc:{cc}"] = 0
+        for cc in range(22, 30): self.control_values[f"cc:{cc}"] = 0
+        for cc in range(32, 40): self.control_values[f"cc:{cc}"] = 0
+        for cc in [114, 115, 116, 117, 118, 119]: self.control_values[f"cc:{cc}"] = 0
+        self.control_values["cc:1"] = 0
+        self.control_values["pitchwheel"] = 0
+
         # Setup GUI layout
         self.setup_ui()
 
@@ -242,24 +251,25 @@ class Mpk249App(ctk.CTk):
     def setup_mappings_tab(self):
         # 1 Row for Visual Canvas (Row 0), 1 Row for Mappings Grid (Row 1)
         self.tab_mappings.grid_columnconfigure(0, weight=1)
-        self.tab_mappings.grid_rowconfigure(0, weight=0) # canvas row
-        self.tab_mappings.grid_rowconfigure(1, weight=1) # list/form row
+        self.tab_mappings.grid_rowconfigure(0, weight=3) # canvas row (expands)
+        self.tab_mappings.grid_rowconfigure(1, weight=2) # list/form row (expands)
 
         # --- Visual Canvas Frame ---
         self.canvas_frame = ctk.CTkFrame(self.tab_mappings, corner_radius=10)
-        self.canvas_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
+        self.canvas_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 5))
         self.canvas_frame.grid_columnconfigure(0, weight=1)
+        self.canvas_frame.grid_rowconfigure(1, weight=1)
 
         # Draw Title
         self.lbl_visual_title = ctk.CTkLabel(
             self.canvas_frame, 
-            text="Interactive MPK249 Schematic — Click any control to map it", 
+            text="Interactive MPK249 Schematic — Click any control to map it (Resizes to fit window)", 
             font=ctk.CTkFont(size=13, weight="bold"),
             text_color="#888"
         )
         self.lbl_visual_title.grid(row=0, column=0, sticky="w", padx=15, pady=(5, 2))
 
-        # Setup Canvas
+        # Setup Canvas (dynamic resizing)
         self.canvas = tk.Canvas(
             self.canvas_frame, 
             width=920, 
@@ -268,15 +278,13 @@ class Mpk249App(ctk.CTk):
             bd=0, 
             highlightthickness=0
         )
-        self.canvas.grid(row=1, column=0, padx=10, pady=(2, 10), sticky="n")
+        self.canvas.grid(row=1, column=0, padx=10, pady=(2, 10), sticky="nsew")
         self.canvas.bind("<Button-1>", self.on_canvas_click)
+        self.canvas.bind("<Configure>", self.on_canvas_resize)
 
         # Mapping tables to track shapes
         self.canvas_items = {}       # control_id -> item data dict
         self.canvas_to_control = {}  # canvas_widget_id -> control_id string
-        
-        # Draw the controller schematic
-        self.draw_keyboard_schematic()
 
         # --- Lower Grid Mappings (List on left, Form on right) ---
         self.mappings_lower_frame = ctk.CTkFrame(self.tab_mappings, fg_color="transparent")
@@ -374,66 +382,132 @@ class Mpk249App(ctk.CTk):
 
         self.on_action_type_change(self.dropdown_action_type.get())
 
-    # ================= SCHEMATIC DRAWING AND UPDATING =================
+    # ================= DYNAMIC SCHEMATIC GEOMETRY AND SCALING =================
+    def get_scale_params(self):
+        """Calculates scale factors and offsets to fit and center the schematic inside the canvas."""
+        canvas_w = self.canvas.winfo_width()
+        canvas_h = self.canvas.winfo_height()
+
+        # Fallback for initial mapping pass
+        if canvas_w < 50 or canvas_h < 50:
+            canvas_w = 920
+            canvas_h = 280
+
+        target_ratio = 920.0 / 280.0
+        if canvas_w / canvas_h > target_ratio:
+            h = canvas_h
+            w = h * target_ratio
+        else:
+            w = canvas_w
+            h = w / target_ratio
+
+        scale = w / 920.0
+        dx = (canvas_w - w) / 2
+        dy = (canvas_h - h) / 2
+        return scale, dx, dy
+
+    def on_canvas_resize(self, event):
+        """Callback triggered on Canvas resize config events to redraw schematic elements."""
+        self.canvas.delete("all")
+        self.canvas_items.clear()
+        self.canvas_to_control.clear()
+        self.draw_keyboard_schematic()
+        
+        # Restore selection highlight if active
+        if self.selected_canvas_control_id:
+            self.highlight_canvas_control(self.selected_canvas_control_id)
+
     def draw_keyboard_schematic(self):
-        """Draws the detailed vector layout of the MPK249 controller."""
-        # 1. Main Chassis
-        self.canvas.create_rectangle(10, 10, 910, 270, fill="#181819", outline="#323235", width=2)
+        """Draws the vector schematic dynamically scaled to the current canvas dimensions."""
+        scale, dx, dy = self.get_scale_params()
 
-        # 2. Section Separators (Subtle lines)
-        self.canvas.create_line(330, 10, 330, 180, fill="#252528", width=1)
-        self.canvas.create_line(510, 10, 510, 180, fill="#252528", width=1)
+        # Helper coordinate scaling functions
+        def sc(x, y):
+            return dx + x * scale, dy + y * scale
 
-        # 3. LCD Screen
-        self.canvas.create_rectangle(350, 25, 490, 75, fill="#011f3d", outline="#023b75", width=2)
-        self.lcd_text_title = self.canvas.create_text(420, 38, text="MPK249 MIDI CTRL", fill="#00ffff", font=("Courier", 10, "bold"))
-        self.lcd_text_status = self.canvas.create_text(420, 58, text="Device: Standby", fill="#00ffaa", font=("Courier", 9))
+        def sz(val):
+            return val * scale
 
-        # 4. Pitch and Mod Wheels
+        # 1. Main Chassis Frame
+        chassis_id = self.canvas.create_rectangle(sc(10, 10), sc(910, 270), fill="#181819", outline="#323235", width=sz(2))
+
+        # 2. Section Separator panel lines
+        self.canvas.create_line(sc(330, 10), sc(330, 180), fill="#252528", width=sz(1))
+        self.canvas.create_line(sc(510, 10), sc(510, 180), fill="#252528", width=sz(1))
+
+        # 3. LCD Display Panel
+        self.canvas.create_rectangle(sc(350, 25), sc(490, 75), fill="#011f3d", outline="#023b75", width=sz(2))
+        
+        status_text = "Device: Connected" if self.is_connected else "Device: Standby"
+        self.lcd_text_title = self.canvas.create_text(
+            sc(420, 38), 
+            text="MPK249 MIDI CTRL", 
+            fill="#00ffff", 
+            font=("Courier", max(4, int(10 * scale)), "bold")
+        )
+        self.lcd_text_status = self.canvas.create_text(
+            sc(420, 58), 
+            text=status_text, 
+            fill="#00ffaa", 
+            font=("Courier", max(4, int(9 * scale)))
+        )
+
+        # 4. Mod and Pitch Wheels (rendered at their current MIDI values)
         # Pitch Bend
-        p_id = self.canvas.create_rectangle(25, 45, 45, 95, fill="#222", outline="#444", width=1.5)
-        p_ind = self.canvas.create_line(25, 70, 45, 70, fill="#ff8c00", width=2)
+        p_val = self.control_values.get("pitchwheel", 0)
+        p_pct = (p_val + 8192) / 16383.0
+        p_y = 95 - p_pct * 50
+        
+        p_id = self.canvas.create_rectangle(sc(25, 45), sc(45, 95), fill="#222", outline="#444", width=sz(1.5))
+        p_ind = self.canvas.create_line(sc(25, p_y), sc(45, p_y), fill="#ff8c00", width=sz(2))
         self.canvas_items["pitchwheel"] = {
             "type": "wheel", "rect_id": p_id, "indicator_id": p_ind, 
-            "original_color": "#222", "original_outline": "#444", "original_width": 1.5,
+            "original_color": "#222", "original_outline": "#444", "original_width": sz(1.5),
             "y_range": (45, 95), "name": "Pitch Bend Wheel"
         }
         self.canvas_to_control[p_id] = "pitchwheel"
 
         # Modulation Wheel
-        m_id = self.canvas.create_rectangle(55, 45, 75, 95, fill="#222", outline="#444", width=1.5)
-        m_ind = self.canvas.create_line(55, 95, 75, 95, fill="#ff8c00", width=2)
+        m_val = self.control_values.get("cc:1", 0)
+        m_pct = m_val / 127.0
+        m_y = 95 - m_pct * 50
+        
+        m_id = self.canvas.create_rectangle(sc(55, 45), sc(75, 95), fill="#222", outline="#444", width=sz(1.5))
+        m_ind = self.canvas.create_line(sc(55, m_y), sc(75, m_y), fill="#ff8c00", width=sz(2))
         self.canvas_items["cc:1"] = {
             "type": "wheel", "rect_id": m_id, "indicator_id": m_ind, 
-            "original_color": "#222", "original_outline": "#444", "original_width": 1.5,
+            "original_color": "#222", "original_outline": "#444", "original_width": sz(1.5),
             "y_range": (45, 95), "name": "Modulation Wheel"
         }
         self.canvas_to_control[m_id] = "cc:1"
 
-        # 5. Pads (4x4 Matrix)
-        # Coordinates start at x=115, y=25. Spacing is 32px
-        for row in range(4): # 0 (bottom) to 3 (top)
-            for col in range(4): # 0 (left) to 3 (right)
+        # 5. Pads (4x4 matrix)
+        for row in range(4):
+            for col in range(4):
                 pad_num = row * 4 + col + 1
-                note_num = 36 + (row * 4 + col) # C1 = 36
+                note_num = 36 + (row * 4 + col)
                 control_id = f"note:{note_num}"
                 
                 px = 115 + col * 52
                 py = 135 - row * 34
                 
-                pad_id = self.canvas.create_rectangle(px, py, px+42, py+26, fill="#121214", outline="#0088cc", width=1.5)
-                # Text identifier
-                self.canvas.create_text(px+21, py+13, text=f"P{pad_num}", fill="#444449", font=("Arial", 9, "bold"), state="disabled")
+                pad_id = self.canvas.create_rectangle(sc(px, py), sc(px+42, py+26), fill="#121214", outline="#0088cc", width=sz(1.5))
+                self.canvas.create_text(
+                    sc(px+21, py+13), 
+                    text=f"P{pad_num}", 
+                    fill="#444449", 
+                    font=("Arial", max(4, int(9 * scale)), "bold"), 
+                    state="disabled"
+                )
                 
                 self.canvas_items[control_id] = {
                     "type": "pad", "rect_id": pad_id,
-                    "original_color": "#121214", "original_outline": "#0088cc", "original_width": 1.5,
+                    "original_color": "#121214", "original_outline": "#0088cc", "original_width": sz(1.5),
                     "name": f"Pad {pad_num} (Note {note_num})"
                 }
                 self.canvas_to_control[pad_id] = control_id
 
-        # 6. Transport Controls (Below LCD)
-        # Rewind, FF, Stop, Play, Record, Loop
+        # 6. Transport Buttons
         transport_configs = [
             {"cc": "cc:114", "text": "LOOP", "x": 345, "fill": "#222"},
             {"cc": "cc:115", "text": "<<"  , "x": 372, "fill": "#222"},
@@ -444,111 +518,132 @@ class Mpk249App(ctk.CTk):
         ]
         for btn in transport_configs:
             bx = btn["x"]
-            btn_id = self.canvas.create_rectangle(bx, 90, bx+23, 110, fill=btn["fill"], outline="#666", width=1)
-            self.canvas.create_text(bx+11, 100, text=btn["text"], fill="#888", font=("Arial", 7, "bold"), state="disabled")
+            btn_id = self.canvas.create_rectangle(sc(bx, 90), sc(bx+23, 110), fill=btn["fill"], outline="#666", width=sz(1))
+            self.canvas.create_text(
+                sc(bx+11, 100), 
+                text=btn["text"], 
+                fill="#888", 
+                font=("Arial", max(4, int(7 * scale)), "bold"), 
+                state="disabled"
+            )
             
             self.canvas_items[btn["cc"]] = {
                 "type": "transport", "rect_id": btn_id,
-                "original_color": btn["fill"], "original_outline": "#666", "original_width": 1.0,
+                "original_color": btn["fill"], "original_outline": "#666", "original_width": sz(1.0),
                 "name": f"Transport {btn['text']}"
             }
             self.canvas_to_control[btn_id] = btn["cc"]
 
         # 7. Knobs (K1 - K8)
-        # Spaced out in the right section
         for i in range(8):
             cc_num = 22 + i
             control_id = f"cc:{cc_num}"
             kx = 535 + i * 46
             ky = 32
             
-            # Knob Circle
-            knob_id = self.canvas.create_oval(kx-12, ky-12, kx+12, ky+12, fill="#1b1b1c", outline="#666", width=2)
-            # Pointer Line pointing at 0 value (bottom-left, -135 degrees)
-            rad = math.radians(-135)
+            knob_id = self.canvas.create_oval(sc(kx-12, ky-12), sc(kx+12, ky+12), fill="#1b1b1c", outline="#666", width=sz(2))
+            
+            val = self.control_values.get(control_id, 0)
+            angle = -135 + (val / 127.0) * 270
+            rad = math.radians(angle)
             px = kx + 12 * math.sin(rad)
             py = ky - 12 * math.cos(rad)
-            pointer_id = self.canvas.create_line(kx, ky, px, py, fill="#ff8c00", width=2)
             
-            self.canvas.create_text(kx, ky+20, text=f"K{i+1}", fill="#555", font=("Arial", 8), state="disabled")
+            pointer_id = self.canvas.create_line(sc(kx, ky), sc(px, py), fill="#ff8c00", width=sz(2))
+            self.canvas.create_text(
+                sc(kx, ky+20), 
+                text=f"K{i+1}", 
+                fill="#555", 
+                font=("Arial", max(4, int(8 * scale))), 
+                state="disabled"
+            )
 
             self.canvas_items[control_id] = {
                 "type": "knob", "rect_id": knob_id, "pointer_id": pointer_id, "center": (kx, ky),
-                "original_color": "#1b1b1c", "original_outline": "#666", "original_width": 2.0,
+                "original_color": "#1b1b1c", "original_outline": "#666", "original_width": sz(2.0),
                 "name": f"Knob K{i+1} (CC {cc_num})"
             }
             self.canvas_to_control[knob_id] = control_id
 
         # 8. Faders (F1 - F8)
-        # Spaced below knobs
         for i in range(8):
             cc_num = 12 + i
             control_id = f"cc:{cc_num}"
             fx = 535 + i * 46
             y_start, y_end = 65, 135
             
-            # Draw Track
-            track_id = self.canvas.create_line(fx, y_start, fx, y_end, fill="#121213", width=4)
-            # Draw Fader Cap (Initially at 0 value, bottom)
-            cap_id = self.canvas.create_rectangle(fx-9, y_end-4, fx+9, y_end+4, fill="#1c1c1f", outline="#ffaa00", width=1.5)
+            track_id = self.canvas.create_line(sc(fx, y_start), sc(fx, y_end), fill="#121213", width=sz(4))
             
-            self.canvas.create_text(fx, y_end+10, text=f"F{i+1}", fill="#555", font=("Arial", 8), state="disabled")
+            val = self.control_values.get(control_id, 0)
+            y_pos = y_end - (val / 127.0) * (y_end - y_start)
+            
+            cap_id = self.canvas.create_rectangle(sc(fx-9, y_pos-4), sc(fx+9, y_pos+4), fill="#1c1c1f", outline="#ffaa00", width=sz(1.5))
+            self.canvas.create_text(
+                sc(fx, y_end+10), 
+                text=f"F{i+1}", 
+                fill="#555", 
+                font=("Arial", max(4, int(8 * scale))), 
+                state="disabled"
+            )
             
             self.canvas_items[control_id] = {
                 "type": "fader", "rect_id": cap_id, "track_id": track_id, "range": (y_start, y_end), "x": fx,
-                "original_color": "#1c1c1f", "original_outline": "#ffaa00", "original_width": 1.5,
+                "original_color": "#1c1c1f", "original_outline": "#ffaa00", "original_width": sz(1.5),
                 "name": f"Fader F{i+1} (CC {cc_num})"
             }
             self.canvas_to_control[cap_id] = control_id
 
-        # 9. Switches / Buttons (S1 - S8)
-        # Located below faders
+        # 9. Switches (S1 - S8)
         for i in range(8):
             cc_num = 32 + i
             control_id = f"cc:{cc_num}"
             sx = 535 + i * 46
             sy = 162
             
-            switch_id = self.canvas.create_rectangle(sx-7, sy-5, sx+7, sy+5, fill="#18181a", outline="#888", width=1.2)
-            self.canvas.create_text(sx, sy+13, text=f"S{i+1}", fill="#555", font=("Arial", 7), state="disabled")
+            switch_id = self.canvas.create_rectangle(sc(sx-7, sy-5), sc(sx+7, sy+5), fill="#18181a", outline="#888", width=sz(1.2))
+            self.canvas.create_text(
+                sc(sx, sy+13), 
+                text=f"S{i+1}", 
+                fill="#555", 
+                font=("Arial", max(4, int(7 * scale))), 
+                state="disabled"
+            )
             
             self.canvas_items[control_id] = {
                 "type": "switch", "rect_id": switch_id,
-                "original_color": "#18181a", "original_outline": "#888", "original_width": 1.2,
+                "original_color": "#18181a", "original_outline": "#888", "original_width": sz(1.2),
                 "name": f"Switch S{i+1} (CC {cc_num})"
             }
             self.canvas_to_control[switch_id] = control_id
 
-        # 10. Keybed (Piano Keys)
-        # Note range C2 (48) to C6 (96) represents a standard 49 key layout
-        # Let's map white and black keys between x=20 and x=900, y=190 to y=265
+        # 10. Keybed (White and Black Keys)
         white_notes = []
         black_notes = []
-        for note in range(48, 97): # 49 keys: 48 to 96
+        for note in range(48, 97):
             if (note % 12) in [1, 3, 6, 8, 10]:
                 black_notes.append(note)
             else:
                 white_notes.append(note)
 
-        white_key_width = 880 / len(white_notes) # 29 white keys
+        white_key_width = 880.0 / len(white_notes)
         
-        # Draw white keys first
+        # White Keys
         for idx, note in enumerate(white_notes):
             x1 = 20 + idx * white_key_width
             x2 = x1 + white_key_width
             y1, y2 = 190, 265
             
-            key_id = self.canvas.create_rectangle(x1, y1, x2, y2, fill="#f8f8fa", outline="#666", width=1)
+            key_id = self.canvas.create_rectangle(sc(x1, y1), sc(x2, y2), fill="#f8f8fa", outline="#666", width=sz(1))
             control_id = f"note:{note}"
             
             self.canvas_items[control_id] = {
                 "type": "key", "rect_id": key_id,
-                "original_color": "#f8f8fa", "original_outline": "#666", "original_width": 1.0,
+                "original_color": "#f8f8fa", "original_outline": "#666", "original_width": sz(1.0),
                 "name": f"Key {note}"
             }
             self.canvas_to_control[key_id] = control_id
 
-        # Draw black keys overlapping white keys
+        # Black Keys
         white_lookup = {note: idx for idx, note in enumerate(white_notes)}
         black_width = white_key_width * 0.6
         black_height = 46
@@ -562,30 +657,27 @@ class Mpk249App(ctk.CTk):
                 x2 = x_center + black_width / 2
                 y1, y2 = 190, 190 + black_height
                 
-                key_id = self.canvas.create_rectangle(x1, y1, x2, y2, fill="#1c1c1f", outline="#000", width=1)
+                key_id = self.canvas.create_rectangle(sc(x1, y1), sc(x2, y2), fill="#1c1c1f", outline="#000", width=sz(1))
                 control_id = f"note:{note}"
                 
                 self.canvas_items[control_id] = {
                     "type": "key", "rect_id": key_id,
-                    "original_color": "#1c1c1f", "original_outline": "#000", "original_width": 1.0,
+                    "original_color": "#1c1c1f", "original_outline": "#000", "original_width": sz(1.0),
                     "name": f"Key {note}"
                 }
                 self.canvas_to_control[key_id] = control_id
 
     def on_canvas_click(self, event):
         """Finds clicked item on the canvas schematic and opens it in the editor."""
-        # Find item closest to click coordinate
         clicked_tags = self.canvas.find_withtag("current")
         if not clicked_tags:
             return
             
         canvas_id = clicked_tags[0]
-        
-        # Check if this canvas ID corresponds to a physical control in our database
         control_id = self.canvas_to_control.get(canvas_id)
+        
         if not control_id:
-            # Check if clicked on sub-elements (like lines inside knobs, fader tracks)
-            # Find closest item if "current" was generic background/text
+            # Fallback for subelements
             closest_items = self.canvas.find_closest(event.x, event.y, halo=3)
             for item in closest_items:
                 if item in self.canvas_to_control:
@@ -598,25 +690,20 @@ class Mpk249App(ctk.CTk):
 
     def select_control_by_id(self, control_id):
         """Highlights control on visual canvas and populates the editor form."""
-        # Highlight item on canvas
         self.highlight_canvas_control(control_id)
         
-        # Prepopulate the form
         self.entry_control_id.delete(0, tk.END)
         self.entry_control_id.insert(0, control_id)
         
-        # Load details if mapped
         if control_id in self.active_mappings:
             self.edit_mapping(control_id)
         else:
-            # Suggest descriptions
             self.clear_mapping_form()
             self.entry_control_id.insert(0, control_id)
             
             desc = self.canvas_items[control_id]["name"] if control_id in self.canvas_items else "Custom Control"
             self.entry_description.insert(0, desc)
             
-            # Default to volume_set for faders/knobs
             if control_id.startswith("cc:"):
                 cc_val = int(control_id.split(":")[1])
                 if cc_val in range(12, 20): # Faders
@@ -628,6 +715,8 @@ class Mpk249App(ctk.CTk):
 
     def highlight_canvas_control(self, control_id):
         """Highlights the selected control on the visual schematic."""
+        scale, dx, dy = self.get_scale_params()
+
         # Clear previous highlight
         if self.selected_canvas_control_id and self.selected_canvas_control_id in self.canvas_items:
             old_item = self.canvas_items[self.selected_canvas_control_id]
@@ -637,69 +726,71 @@ class Mpk249App(ctk.CTk):
 
         self.selected_canvas_control_id = control_id
 
-        # Apply new orange outline highlight
+        # Apply orange border highlight scaled
         if control_id in self.canvas_items:
             item = self.canvas_items[control_id]
-            self.canvas.itemconfig(item["rect_id"], outline="#ff6c00", width=2.5)
+            self.canvas.itemconfig(item["rect_id"], outline="#ff6c00", width=2.5 * scale)
 
     def update_canvas_control(self, control_id, value):
         """Updates faders, knobs, pads, and keys visually on the canvas when physical inputs occur."""
         if control_id not in self.canvas_items:
             return
 
+        # Store latest value in database
+        self.control_values[control_id] = value
+
         item = self.canvas_items[control_id]
         ctl_type = item["type"]
+        scale, dx, dy = self.get_scale_params()
 
-        # Update LCD Status Screen
+        def sc(x, y):
+            return dx + x * scale, dy + y * scale
+
+        # Update LCD screen text
         self.canvas.itemconfig(self.lcd_text_status, text=f"{item['name'].split(' ')[0]} {control_id}: {value}")
 
         if ctl_type in ["pad", "key", "switch", "transport"]:
-            # Flash cyan/green to show trigger activity
             rect_id = item["rect_id"]
             flash_color = "#00f3ff" if ctl_type == "pad" else "#4de680"
-            if ctl_type == "transport" and control_id == "cc:119": # Record red flash
+            if ctl_type == "transport" and control_id == "cc:119":
                 flash_color = "#ff3333"
                 
             self.canvas.itemconfig(rect_id, fill=flash_color)
             original_color = item["original_color"]
-            
-            # Reset color after 150ms
             self.after(150, lambda r=rect_id, c=original_color: self.canvas.itemconfig(r, fill=c))
 
         elif ctl_type == "knob":
-            # Rotate line pointer dynamically based on value (0-127 mapped to -135 to 135 degrees)
             kx, ky = item["center"]
             angle = -135 + (value / 127.0) * 270
             rad = math.radians(angle)
             px = kx + 12 * math.sin(rad)
             py = ky - 12 * math.cos(rad)
             
-            self.canvas.coords(item["pointer_id"], kx, ky, px, py)
+            self.canvas.coords(item["pointer_id"], sc(kx, ky) + sc(px, py))
 
         elif ctl_type == "fader":
-            # Slide fader cap vertically
             y_start, y_end = item["range"]
             fx = item["x"]
-            # Map 0-127 (value) to y_end down to y_start (vertical coordinate inverted)
             y_pos = y_end - (value / 127.0) * (y_end - y_start)
             
-            self.canvas.coords(item["rect_id"], fx-9, y_pos-4, fx+9, y_pos+4)
+            self.canvas.coords(item["rect_id"], sc(fx-9, y_pos-4) + sc(fx+9, y_pos+4))
 
         elif ctl_type == "wheel":
-            # Slide mod wheel indicator
             y_start, y_end = item["y_range"]
-            # Map value 0-127 (if pitchbend: -8192 to 8191)
             pct = 0.5
             if control_id == "pitchwheel":
-                # value is -8192 to 8191. Map to 0.0 - 1.0
                 pct = (value + 8192) / 16383.0
             else:
                 pct = value / 127.0
                 
             y_pos = y_end - pct * (y_end - y_start)
-            # Find bounds
-            x1, y1, x2, y2 = self.canvas.coords(item["rect_id"])
-            self.canvas.coords(item["indicator_id"], x1, y_pos, x2, y_pos)
+            
+            if control_id == "pitchwheel":
+                wx1, wx2 = 25, 45
+            else:
+                wx1, wx2 = 55, 75
+                
+            self.canvas.coords(item["indicator_id"], sc(wx1, y_pos) + sc(wx2, y_pos))
 
     # ================= MIDI EVENT HANDLING =================
     def handle_midi_input(self, msg, control_id, value):
@@ -707,13 +798,9 @@ class Mpk249App(ctk.CTk):
         try:
             logging.debug(f"Received MIDI Event -> Control ID: {control_id}, Value: {value}, Raw Msg: {msg}")
             
-            # Update Dashboard Visuals via main thread threadsafe call
             self.after(0, self.update_dashboard_signal, control_id, value)
-            
-            # Update the interactive vector schematic canvas in real-time
             self.after(0, self.update_canvas_control, control_id, value)
             
-            # Check if mapped action exists in the current preset
             if control_id in self.active_mappings:
                 mapping = self.active_mappings[control_id]
                 action_type = mapping.get("action_type")
@@ -721,14 +808,10 @@ class Mpk249App(ctk.CTk):
                 desc = mapping.get("description", "Unknown Action")
                 
                 self.after(0, lambda d=desc, a=action_type: self.lbl_action_fired.configure(text=f"Fired: {d} ({a})"))
-                
-                # Execute the action
-                logging.info(f"Triggering action '{action_type}' for Control '{control_id}' with params={params}")
                 self.action_handler.execute(action_type, params, value)
             else:
                 self.after(0, lambda: self.lbl_action_fired.configure(text="Action: (unmapped)"))
 
-            # Log to the live midi monitor tab
             log_msg = f"MIDI Input | Type: {msg.type:<15} | Control ID: {control_id:<10} | Value: {value:<5}"
             self.after(0, self.log_to_monitor, log_msg)
         except Exception as e:
@@ -754,7 +837,6 @@ class Mpk249App(ctk.CTk):
     def update_dashboard_signal(self, control_id, value):
         self.lbl_midi_ctrl_name.configure(text=f"Active Control: {control_id}")
         self.lbl_midi_val_number.configure(text=f"Value: {value}")
-        # Scale progress bar 0-127 -> 0.0 - 1.0 (if pitchbend, scale appropriately)
         if control_id == "pitchwheel":
             self.progress_midi_val.set((value + 8192) / 16383.0)
         else:
@@ -797,7 +879,6 @@ class Mpk249App(ctk.CTk):
 
     # ================= MAPPINGS EDITOR FORM =================
     def on_action_type_change(self, choice):
-        """Changes parameters label, input box configuration, and description hints dynamically."""
         self.entry_param_val.delete(0, tk.END)
         logging.debug(f"Action type dropdown selection changed to {choice}")
         
@@ -842,13 +923,11 @@ class Mpk249App(ctk.CTk):
             self.entry_param_val.configure(state="normal")
 
     def start_midi_learn(self):
-        """Enables MIDI learn mode and updates button text."""
         logging.info("Enabling MIDI learn mode")
         self.btn_learn.configure(text="Listening...", fg_color="#d68a00")
         self.midi_manager.enable_midi_learn(self.on_midi_learned)
 
     def on_midi_learned(self, control_id, msg_type, channel):
-        """Callback fired when MIDI Manager learns a new control."""
         logging.info(f"Control learned in background thread: control_id={control_id}, type={msg_type}")
         self.after(0, self.update_learned_control, control_id)
 
@@ -857,10 +936,8 @@ class Mpk249App(ctk.CTk):
         self.entry_control_id.insert(0, control_id)
         self.btn_learn.configure(text="MIDI Learn", fg_color=["#3B8ED0", "#1F6AA5"])
         
-        # Highlight on canvas if matches a visual element
         self.highlight_canvas_control(control_id)
 
-        # Suggest description based on control ID
         self.entry_description.delete(0, tk.END)
         if control_id in self.canvas_items:
             desc = self.canvas_items[control_id]["name"]
@@ -877,7 +954,6 @@ class Mpk249App(ctk.CTk):
         self.log_to_monitor(f"MIDI Learn | Learned control ID: {control_id}")
 
     def save_mapping_form(self):
-        """Saves or updates the mapping in the current preset from the form."""
         control_id = self.entry_control_id.get().strip()
         description = self.entry_description.get().strip()
         action_type = self.dropdown_action_type.get()
@@ -889,7 +965,6 @@ class Mpk249App(ctk.CTk):
             tk.messagebox.showerror("Validation Error", "Control ID is required. Try using MIDI Learn or clicking the schematic.")
             return
 
-        # Prepare parameters dictionary
         params = {}
         if action_type in ["volume_up", "volume_down"]:
             try:
@@ -911,7 +986,6 @@ class Mpk249App(ctk.CTk):
         if not description:
             description = f"{action_type.capitalize()} on {control_id}"
 
-        # Save mapping
         self.active_mappings[control_id] = {
             "action_type": action_type,
             "description": description,
@@ -924,7 +998,6 @@ class Mpk249App(ctk.CTk):
         self.log_to_monitor(f"Mappings | Saved mapping for {control_id}")
 
     def edit_mapping(self, key):
-        """Loads a mapping into the editing form."""
         if key not in self.active_mappings:
             return
         
@@ -942,7 +1015,6 @@ class Mpk249App(ctk.CTk):
         self.dropdown_action_type.set(action_type)
         self.on_action_type_change(action_type)
         
-        # Load parameters
         params = mapping.get("params", {})
         self.entry_param_val.delete(0, tk.END)
         
@@ -958,7 +1030,6 @@ class Mpk249App(ctk.CTk):
             self.entry_param_val.insert(0, str(params.get("amount", 1)))
 
     def delete_mapping(self, key):
-        """Deletes a mapping from the current preset."""
         if key in self.active_mappings:
             logging.info(f"Deleting mapping for '{key}'")
             del self.active_mappings[key]
@@ -978,9 +1049,7 @@ class Mpk249App(ctk.CTk):
         self.btn_learn.configure(text="MIDI Learn", fg_color=["#3B8ED0", "#1F6AA5"])
 
     def load_mappings_list(self):
-        """Renders the active mappings list in the GUI."""
         logging.debug("Redrawing mappings scroll container list")
-        # Clear existing children of the scroll container
         for widget in self.scroll_mappings.winfo_children():
             widget.destroy()
 
@@ -996,12 +1065,10 @@ class Mpk249App(ctk.CTk):
 
         row = 0
         for key, mapping in sorted(self.active_mappings.items()):
-            # Create a card frame for each mapping
             card = ctk.CTkFrame(self.scroll_mappings, corner_radius=6, fg_color=("#e5e5e5", "#242424"))
             card.grid(row=row, column=0, sticky="ew", padx=5, pady=4)
             card.grid_columnconfigure(0, weight=1)
 
-            # Left side: labels
             info_frame = ctk.CTkFrame(card, fg_color="transparent")
             info_frame.pack(side="left", fill="both", expand=True, padx=10, pady=8)
 
@@ -1012,7 +1079,6 @@ class Mpk249App(ctk.CTk):
             )
             lbl_title.pack(anchor="w")
 
-            # Formulate detail string
             action_type = mapping.get("action_type", "")
             params = mapping.get("params", {})
             param_detail = ""
@@ -1035,7 +1101,6 @@ class Mpk249App(ctk.CTk):
             )
             lbl_details.pack(anchor="w")
 
-            # Right side: action buttons (Edit / Delete)
             btn_frame = ctk.CTkFrame(card, fg_color="transparent")
             btn_frame.pack(side="right", padx=10, pady=8)
 
@@ -1065,7 +1130,6 @@ class Mpk249App(ctk.CTk):
         self.tab_monitor.grid_columnconfigure(0, weight=1)
         self.tab_monitor.grid_rowconfigure(1, weight=1)
 
-        # Controls row
         ctrl_frame = ctk.CTkFrame(self.tab_monitor)
         ctrl_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         
@@ -1075,7 +1139,6 @@ class Mpk249App(ctk.CTk):
         self.chk_pause_log = ctk.CTkCheckBox(ctrl_frame, text="Pause Logging", command=self.toggle_logging)
         self.chk_pause_log.pack(side="left", padx=20, pady=5)
 
-        # Text monitor
         self.txt_monitor = ctk.CTkTextbox(self.tab_monitor, wrap="none", font=ctk.CTkFont(family="monospace", size=12))
         self.txt_monitor.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.txt_monitor.configure(state="disabled")
@@ -1097,7 +1160,6 @@ class Mpk249App(ctk.CTk):
         self.txt_monitor.insert(tk.END, text + "\n")
         self.txt_monitor.see(tk.END)
         
-        # Cap log length to prevent memory issues
         lines = self.txt_monitor.get("1.0", tk.END).splitlines()
         if len(lines) > 500:
             self.txt_monitor.delete("1.0", "150.0")
