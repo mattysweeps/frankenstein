@@ -378,7 +378,7 @@ class Mpk249App(ctk.CTk):
     def draw_keyboard_schematic(self):
         """Draws the detailed vector layout of the MPK249 controller."""
         # 1. Main Chassis
-        self.canvas.create_rectangle(10, 10, 910, 270, fill="#181819", outline="#323235", width=2, corner_radius=10)
+        self.canvas.create_rectangle(10, 10, 910, 270, fill="#181819", outline="#323235", width=2)
 
         # 2. Section Separators (Subtle lines)
         self.canvas.create_line(330, 10, 330, 180, fill="#252528", width=1)
