@@ -431,6 +431,9 @@ class Mpk249App(ctk.CTk):
         if self.selected_canvas_control_id:
             self.highlight_canvas_control(self.selected_canvas_control_id)
 
+        # Force immediate window refresh to avoid hover rendering issues
+        self.update_idletasks()
+
     def draw_keyboard_schematic(self, width=None, height=None):
         """Draws the vector schematic dynamically scaled to the specified dimensions."""
         canvas_w = width if width is not None else self.canvas.winfo_width()
