@@ -1061,6 +1061,25 @@ class Mpk249App(ctk.CTk):
 
             row += 1
 
+    def setup_monitor_tab(self):
+        self.tab_monitor.grid_columnconfigure(0, weight=1)
+        self.tab_monitor.grid_rowconfigure(1, weight=1)
+
+        # Controls row
+        ctrl_frame = ctk.CTkFrame(self.tab_monitor)
+        ctrl_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        
+        self.btn_clear_log = ctk.CTkButton(ctrl_frame, text="Clear Log", command=self.clear_monitor_log, width=100)
+        self.btn_clear_log.pack(side="left", padx=10, pady=5)
+
+        self.chk_pause_log = ctk.CTkCheckBox(ctrl_frame, text="Pause Logging", command=self.toggle_logging)
+        self.chk_pause_log.pack(side="left", padx=20, pady=5)
+
+        # Text monitor
+        self.txt_monitor = ctk.CTkTextbox(self.tab_monitor, wrap="none", font=ctk.CTkFont(family="monospace", size=12))
+        self.txt_monitor.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.txt_monitor.configure(state="disabled")
+
     # ================= LIVE MIDI MONITOR LOGGING =================
     def toggle_logging(self):
         self.is_logging_paused = self.chk_pause_log.get()
