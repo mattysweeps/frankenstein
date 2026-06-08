@@ -1,10 +1,32 @@
 import os
 import json
 import sys
+import logging
+import traceback
 import tkinter as tk
 import customtkinter as ctk
 from midi_manager import MidiManager
 from action_handler import ActionHandler
+
+# Configure logging to write to app.log and stdout
+LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app.log")
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] (%(threadName)s) %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE, mode="w"),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    """Global handler for uncaught exceptions."""
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    logging.critical("Uncaught exception in main loop:", exc_info=(exc_type, exc_value, exc_traceback))
+
+sys.excepthook = handle_exception
 
 # Set appearance mode and color theme
 ctk.set_appearance_mode("Dark")
@@ -15,6 +37,7 @@ CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.j
 class Mpk249App(ctk.CTk):
     def __init__(self):
         super().__init__()
+        logging.info("Initializing MPK249 Control Center App")
 
         self.title("MPK249 Desktop Control Center")
         self.geometry("950x700")
@@ -47,14 +70,18 @@ class Mpk249App(ctk.CTk):
 
     def load_config(self):
         """Loads configuration from JSON file. Falls back to default if file corrupt/missing."""
+        logging.info(f"Loading config from {CONFIG_FILE}")
         if os.path.exists(CONFIG_FILE):
             try:
                 with open(CONFIG_FILE, "r") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    logging.info("Config loaded successfully")
+                    return data
             except Exception as e:
-                print(f"Error reading config: {e}", file=sys.stderr)
+                logging.error(f"Error reading config: {e}", exc_info=True)
         
         # Default config structure if file not found
+        logging.warning("Config file not found or corrupted, using empty defaults")
         return {
             "active_preset": "Default Desktop Mappings",
             "presets": {
@@ -72,11 +99,14 @@ class Mpk249App(ctk.CTk):
             
             with open(CONFIG_FILE, "w") as f:
                 json.dump(self.config_data, f, indent=2)
+            logging.info(f"Config saved successfully to {CONFIG_FILE}")
         except Exception as e:
+            logging.error(f"Failed to save config: {e}", exc_info=True)
             self.log_to_monitor(f"System Error: Failed to save config: {e}")
 
     # ================= UI SETUP =================
     def setup_ui(self):
+        logging.debug("Setting up GUI widgets")
         # Grid Configuration (1 Column, Multi-Row)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -326,27 +356,33 @@ class Mpk249App(ctk.CTk):
     # ================= MIDI EVENT HANDLING =================
     def handle_midi_input(self, msg, control_id, value):
         """Processes MIDI inputs from the MIDI thread."""
-        # Update Dashboard Visuals via main thread threadsafe call
-        self.after(0, self.update_dashboard_signal, control_id, value)
-        
-        # Check if mapped action exists in the current preset
-        if control_id in self.active_mappings:
-            mapping = self.active_mappings[control_id]
-            action_type = mapping.get("action_type")
-            params = mapping.get("params", {})
-            desc = mapping.get("description", "Unknown Action")
+        try:
+            logging.debug(f"Received MIDI Event -> Control ID: {control_id}, Value: {value}, Raw Msg: {msg}")
             
-            # Update status in dashboard
-            self.after(0, lambda: self.lbl_action_fired.configure(text=f"Fired: {desc} ({action_type})"))
+            # Update Dashboard Visuals via main thread threadsafe call
+            self.after(0, self.update_dashboard_signal, control_id, value)
             
-            # Execute the action
-            self.action_handler.execute(action_type, params, value)
-        else:
-            self.after(0, lambda: self.lbl_action_fired.configure(text="Action: (unmapped)"))
+            # Check if mapped action exists in the current preset
+            if control_id in self.active_mappings:
+                mapping = self.active_mappings[control_id]
+                action_type = mapping.get("action_type")
+                params = mapping.get("params", {})
+                desc = mapping.get("description", "Unknown Action")
+                
+                # Update status in dashboard
+                self.after(0, lambda d=desc, a=action_type: self.lbl_action_fired.configure(text=f"Fired: {d} ({a})"))
+                
+                # Execute the action
+                logging.info(f"Triggering action '{action_type}' for Control '{control_id}' with params={params}")
+                self.action_handler.execute(action_type, params, value)
+            else:
+                self.after(0, lambda: self.lbl_action_fired.configure(text="Action: (unmapped)"))
 
-        # Log to the live midi monitor tab
-        log_msg = f"MIDI Input | Type: {msg.type:<15} | Control ID: {control_id:<10} | Value: {value:<5}"
-        self.after(0, self.log_to_monitor, log_msg)
+            # Log to the live midi monitor tab
+            log_msg = f"MIDI Input | Type: {msg.type:<15} | Control ID: {control_id:<10} | Value: {value:<5}"
+            self.after(0, self.log_to_monitor, log_msg)
+        except Exception as e:
+            logging.error(f"Error handling MIDI input: {e}", exc_info=True)
 
     def handle_connection_status(self, is_connected, path):
         """Callback for device connection state changes."""
@@ -360,12 +396,14 @@ class Mpk249App(ctk.CTk):
                 fg_color="#2da44e"
             )
             self.log_to_monitor(f"System | Device Connected: {path}")
+            logging.info(f"System status change: Connected to {path}")
         else:
             self.status_badge.configure(
                 text="🔴 Disconnected", 
                 fg_color="#cf4444"
             )
-            self.log_to_monitor("System | Device Disconnected. Waiting for MPK249 to be plugged in...")
+            self.log_to_monitor("System | Device Disconnected. Waiting for MPK249...")
+            logging.warning("System status change: Disconnected")
 
     def update_dashboard_signal(self, control_id, value):
         self.lbl_midi_ctrl_name.configure(text=f"Active Control: {control_id}")
@@ -387,8 +425,10 @@ class Mpk249App(ctk.CTk):
         self.save_config()
         self.load_mappings_list()
         self.log_to_monitor(f"Preset | Switched to preset: {preset_name}")
+        logging.info(f"Switched active preset to '{preset_name}'")
 
     def create_new_preset(self):
+        logging.info("Opening New Preset dialog")
         dialog = ctk.CTkInputDialog(text="Enter preset name:", title="New Preset")
         preset_name = dialog.get_input()
         if preset_name:
@@ -404,11 +444,13 @@ class Mpk249App(ctk.CTk):
                 self.update_preset_selector()
                 self.load_mappings_list()
                 self.log_to_monitor(f"Preset | Created new preset: {preset_name}")
+                logging.info(f"Created and switched to new preset '{preset_name}'")
 
     # ================= MAPPINGS EDITOR FORM =================
     def on_action_type_change(self, choice):
         """Changes parameters label, input box configuration, and description hints dynamically."""
         self.entry_param_val.delete(0, tk.END)
+        logging.debug(f"Action type dropdown selection changed to {choice}")
         
         if choice in ["volume_up", "volume_down"]:
             self.param_label.configure(text="Step size (%):")
@@ -452,11 +494,13 @@ class Mpk249App(ctk.CTk):
 
     def start_midi_learn(self):
         """Enables MIDI learn mode and updates button text."""
+        logging.info("Enabling MIDI learn mode")
         self.btn_learn.configure(text="Listening...", fg_color="#d68a00")
         self.midi_manager.enable_midi_learn(self.on_midi_learned)
 
     def on_midi_learned(self, control_id, msg_type, channel):
         """Callback fired when MIDI Manager learns a new control."""
+        logging.info(f"Control learned in background thread: control_id={control_id}, type={msg_type}")
         self.after(0, self.update_learned_control, control_id)
 
     def update_learned_control(self, control_id):
@@ -481,6 +525,8 @@ class Mpk249App(ctk.CTk):
         description = self.entry_description.get().strip()
         action_type = self.dropdown_action_type.get()
         param_text = self.entry_param_val.get().strip()
+
+        logging.info(f"Form submission: save mapping key={control_id}, action={action_type}")
 
         if not control_id:
             tk.messagebox.showerror("Validation Error", "Control ID is required. Try using MIDI Learn.")
@@ -525,6 +571,7 @@ class Mpk249App(ctk.CTk):
         if key not in self.active_mappings:
             return
         
+        logging.info(f"Loading mapping '{key}' for editing")
         self.selected_mapping_key = key
         mapping = self.active_mappings[key]
         
@@ -556,6 +603,7 @@ class Mpk249App(ctk.CTk):
     def delete_mapping(self, key):
         """Deletes a mapping from the current preset."""
         if key in self.active_mappings:
+            logging.info(f"Deleting mapping for '{key}'")
             del self.active_mappings[key]
             self.save_config()
             self.load_mappings_list()
@@ -574,6 +622,7 @@ class Mpk249App(ctk.CTk):
 
     def load_mappings_list(self):
         """Renders the active mappings list in the GUI."""
+        logging.debug("Redrawing mappings scroll container list")
         # Clear existing children of the scroll container
         for widget in self.scroll_mappings.winfo_children():
             widget.destroy()
@@ -682,6 +731,7 @@ class Mpk249App(ctk.CTk):
 
     def on_closing(self):
         """Handles application shutdown cleanly."""
+        logging.info("Application shutting down")
         self.midi_manager.stop()
         self.destroy()
 
