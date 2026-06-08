@@ -104,6 +104,9 @@ class Mpk249App(ctk.CTk):
         self.update_preset_selector()
         self.load_mappings_list()
 
+        # Start signal checking loop to allow Ctrl-C termination in terminal
+        self.check_signals()
+
     def load_config(self):
         """Loads configuration from JSON file. Falls back to default if file corrupt/missing."""
         logging.info(f"Loading config from {CONFIG_FILE}")
@@ -1276,6 +1279,10 @@ class Mpk249App(ctk.CTk):
             self.txt_monitor.delete("1.0", "150.0")
             
         self.txt_monitor.configure(state="disabled")
+
+    def check_signals(self):
+        """Allows Python interpreter to process Ctrl-C signals while running Tkinter mainloop."""
+        self.after(250, self.check_signals)
 
     def on_closing(self):
         """Handles application shutdown cleanly."""
