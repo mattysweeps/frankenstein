@@ -65,6 +65,11 @@ class Mpk249App(ctk.CTk):
         self.control_values["cc:1"] = 0
         self.control_values["pitchwheel"] = 0
 
+        # Saved scale parameters (defaults)
+        self.canvas_scale = 1.0
+        self.canvas_dx = 0.0
+        self.canvas_dy = 0.0
+
         # Setup GUI layout
         self.setup_ui()
 
@@ -390,10 +395,48 @@ class Mpk249App(ctk.CTk):
     # ================= DYNAMIC SCHEMATIC GEOMETRY AND SCALING =================
     def get_scale_params(self):
         """Calculates scale factors and offsets to fit and center the schematic inside the canvas."""
-        canvas_w = self.canvas.winfo_width()
-        canvas_h = self.canvas.winfo_height()
+        scale = getattr(self, "canvas_scale", 1.0)
+        dx = getattr(self, "canvas_dx", 0.0)
+        dy = getattr(self, "canvas_dy", 0.0)
+        return scale, dx, dy
 
-        # Fallback for initial mapping pass
+    def on_canvas_resize(self, event):
+        """Callback triggered on Canvas resize configure events to redraw schematic elements."""
+        # Cancel any pending redraw to debounce the resize events (prevents graphic stutters during dragging)
+        if hasattr(self, "_resize_after_id") and self._resize_after_id:
+            try:
+                self.after_cancel(self._resize_after_id)
+            except Exception:
+                pass
+            
+        # Store latest sizes
+        self._last_resize_w = event.width
+        self._last_resize_h = event.height
+        
+        # Debounce: Schedule redraw to fire after a 50ms pause in resizing
+        self._resize_after_id = self.after(50, self.execute_resize_redraw)
+
+    def execute_resize_redraw(self):
+        """Executes the actual canvas redrawing using stored width and height dimensions."""
+        self._resize_after_id = None
+        w = getattr(self, "_last_resize_w", None)
+        h = getattr(self, "_last_resize_h", None)
+
+        self.canvas.delete("all")
+        self.canvas_items.clear()
+        self.canvas_to_control.clear()
+        self.draw_keyboard_schematic(width=w, height=h)
+        
+        # Restore selection highlight if active
+        if self.selected_canvas_control_id:
+            self.highlight_canvas_control(self.selected_canvas_control_id)
+
+    def draw_keyboard_schematic(self, width=None, height=None):
+        """Draws the vector schematic dynamically scaled to the specified dimensions."""
+        canvas_w = width if width is not None else self.canvas.winfo_width()
+        canvas_h = height if height is not None else self.canvas.winfo_height()
+
+        # Fallback for initial mapping pass before window is drawn
         if canvas_w < 50 or canvas_h < 50:
             canvas_w = 920
             canvas_h = 280
@@ -406,25 +449,16 @@ class Mpk249App(ctk.CTk):
             w = canvas_w
             h = w / target_ratio
 
-        scale = w / 920.0
-        dx = (canvas_w - w) / 2
-        dy = (canvas_h - h) / 2
-        return scale, dx, dy
+        # Store scale parameters globally on instance for real-time update coordinates
+        self.canvas_scale = w / 920.0
+        self.canvas_dx = (canvas_w - w) / 2
+        self.canvas_dy = (canvas_h - h) / 2
+        self.canvas_w = canvas_w
+        self.canvas_h = canvas_h
 
-    def on_canvas_resize(self, event):
-        """Callback triggered on Canvas resize config events to redraw schematic elements."""
-        self.canvas.delete("all")
-        self.canvas_items.clear()
-        self.canvas_to_control.clear()
-        self.draw_keyboard_schematic()
-        
-        # Restore selection highlight if active
-        if self.selected_canvas_control_id:
-            self.highlight_canvas_control(self.selected_canvas_control_id)
-
-    def draw_keyboard_schematic(self):
-        """Draws the vector schematic dynamically scaled to the current canvas dimensions."""
-        scale, dx, dy = self.get_scale_params()
+        scale = self.canvas_scale
+        dx = self.canvas_dx
+        dy = self.canvas_dy
 
         # Helper coordinate scaling functions
         def sc(x, y):
@@ -512,7 +546,7 @@ class Mpk249App(ctk.CTk):
                 }
                 self.canvas_to_control[pad_id] = control_id
 
-        # 6. Transport Buttons
+        # 6. Transport Controls
         transport_configs = [
             {"cc": "cc:114", "text": "LOOP", "x": 345, "fill": "#222"},
             {"cc": "cc:115", "text": "<<"  , "x": 372, "fill": "#222"},
@@ -862,25 +896,6 @@ class Mpk249App(ctk.CTk):
         self.load_mappings_list()
         self.log_to_monitor(f"Preset | Switched to preset: {preset_name}")
         logging.info(f"Switched active preset to '{preset_name}'")
-
-    def create_new_preset(self):
-        logging.info("Opening New Preset dialog")
-        dialog = ctk.CTkInputDialog(text="Enter preset name:", title="New Preset")
-        preset_name = dialog.get_input()
-        if preset_name:
-            preset_name = preset_name.strip()
-            if preset_name:
-                if "presets" not in self.config_data:
-                    self.config_data["presets"] = {}
-                if preset_name not in self.config_data["presets"]:
-                    self.config_data["presets"][preset_name] = {}
-                self.active_preset_name = preset_name
-                self.active_mappings = self.config_data["presets"][preset_name]
-                self.save_config()
-                self.update_preset_selector()
-                self.load_mappings_list()
-                self.log_to_monitor(f"Preset | Created new preset: {preset_name}")
-                logging.info(f"Created and switched to new preset '{preset_name}'")
 
     # ================= MAPPINGS EDITOR FORM =================
     def on_action_type_change(self, choice):
