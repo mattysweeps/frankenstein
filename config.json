@@ -1,0 +1,96 @@
+{
+  "active_preset": "Default Desktop Mappings",
+  "presets": {
+    "Default Desktop Mappings": {
+      "cc:12": {
+        "action_type": "volume_set",
+        "description": "Fader 1: System Master Volume Set",
+        "params": {}
+      },
+      "cc:1": {
+        "action_type": "volume_set",
+        "description": "Modwheel: Master Volume Control",
+        "params": {}
+      },
+      "cc:117": {
+        "action_type": "keypress",
+        "description": "Play Button: Play/Pause Media",
+        "params": {
+          "keys": "media_play_pause"
+        }
+      },
+      "cc:119": {
+        "action_type": "keypress",
+        "description": "Rewind Button: Previous Track",
+        "params": {
+          "keys": "media_prev"
+        }
+      },
+      "cc:120": {
+        "action_type": "keypress",
+        "description": "Fast Forward Button: Next Track",
+        "params": {
+          "keys": "media_next"
+        }
+      },
+      "cc:118": {
+        "action_type": "keypress",
+        "description": "Record Button: Show Desktop (Super+D)",
+        "params": {
+          "keys": "super+d"
+        }
+      },
+      "cc:115": {
+        "action_type": "keypress",
+        "description": "Loop Button: Open Terminal (Ctrl+Alt+T)",
+        "params": {
+          "keys": "ctrl+alt+t"
+        }
+      },
+      "note:36": {
+        "action_type": "command",
+        "description": "Pad 1 (C1): Play Sound / Notification",
+        "params": {
+          "cmd": "paplay /usr/share/sounds/freedesktop/stereo/complete.oga"
+        }
+      },
+      "note:38": {
+        "action_type": "keypress",
+        "description": "Pad 2 (D1): Lock Workstation (Super+L)",
+        "params": {
+          "keys": "super+l"
+        }
+      }
+    },
+    "Presentation Mode": {
+      "cc:117": {
+        "action_type": "keypress",
+        "description": "Play Button: Start Presentation (F5)",
+        "params": {
+          "keys": "f5"
+        }
+      },
+      "cc:120": {
+        "action_type": "keypress",
+        "description": "Fast Forward Button: Next Slide (Right Arrow)",
+        "params": {
+          "keys": "right"
+        }
+      },
+      "cc:119": {
+        "action_type": "keypress",
+        "description": "Rewind Button: Previous Slide (Left Arrow)",
+        "params": {
+          "keys": "left"
+        }
+      },
+      "cc:116": {
+        "action_type": "keypress",
+        "description": "Stop Button: End Slide Show (Esc)",
+        "params": {
+          "keys": "esc"
+        }
+      }
+    }
+  }
+}

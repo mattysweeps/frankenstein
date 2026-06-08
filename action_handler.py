@@ -1,0 +1,168 @@
+import subprocess
+import os
+import sys
+import threading
+from pynput.keyboard import Controller as KeyboardController, Key
+from pynput.mouse import Controller as MouseController, Button
+
+class ActionHandler:
+    def __init__(self):
+        self.keyboard = KeyboardController()
+        self.mouse = MouseController()
+        self._key_map = {
+            "enter": Key.enter,
+            "space": Key.space,
+            "backspace": Key.backspace,
+            "tab": Key.tab,
+            "esc": Key.esc,
+            "escape": Key.esc,
+            "up": Key.up,
+            "down": Key.down,
+            "left": Key.left,
+            "right": Key.right,
+            "pgup": Key.page_up,
+            "pgdn": Key.page_down,
+            "home": Key.home,
+            "end": Key.end,
+            "capslock": Key.caps_lock,
+            "shift": Key.shift,
+            "ctrl": Key.ctrl,
+            "control": Key.ctrl,
+            "alt": Key.alt,
+            "super": Key.cmd,
+            "meta": Key.cmd,
+            "win": Key.cmd,
+            "cmd": Key.cmd,
+            "f1": Key.f1,
+            "f2": Key.f2,
+            "f3": Key.f3,
+            "f4": Key.f4,
+            "f5": Key.f5,
+            "f6": Key.f6,
+            "f7": Key.f7,
+            "f8": Key.f8,
+            "f9": Key.f9,
+            "f10": Key.f10,
+            "f11": Key.f11,
+            "f12": Key.f12,
+            "vol_up": Key.media_volume_up,
+            "vol_down": Key.media_volume_down,
+            "vol_mute": Key.media_volume_mute,
+            "media_play_pause": Key.media_play_pause,
+            "media_next": Key.media_next,
+            "media_prev": Key.media_previous,
+        }
+
+    def execute(self, action_type, params, midi_value=None):
+        """
+        Executes a mapped desktop action.
+        action_type: str ('volume_up', 'volume_down', 'volume_set', 'volume_mute', 
+                          'keypress', 'command', 'mouse_scroll', 'mouse_click', 'mouse_move')
+        params: dict or str depending on action
+        midi_value: int (0-127) for continuous controls (faders/knobs)
+        """
+        try:
+            if action_type == "volume_up":
+                self.adjust_volume(step=params.get("step", 5))
+            elif action_type == "volume_down":
+                self.adjust_volume(step=-params.get("step", 5))
+            elif action_type == "volume_set":
+                if midi_value is not None:
+                    # Map 0-127 to 0-100%
+                    pct = int((midi_value / 127.0) * 100)
+                    self.set_volume(pct)
+            elif action_type == "volume_mute":
+                self.toggle_mute()
+            elif action_type == "keypress":
+                keys_str = params.get("keys", "")
+                self.simulate_keypress(keys_str)
+            elif action_type == "command":
+                cmd_str = params.get("cmd", "")
+                self.run_command(cmd_str)
+            elif action_type == "mouse_scroll":
+                amount = params.get("amount", 1)
+                # If MIDI value is provided, we can scroll proportionally or just scroll on triggers
+                if midi_value is not None:
+                    # Example: scroll amount depends on value change, or simple direction
+                    pass
+                else:
+                    self.mouse.scroll(0, amount)
+            elif action_type == "mouse_click":
+                btn = params.get("button", "left").lower()
+                self.simulate_click(btn)
+            elif action_type == "mouse_move":
+                # For continuous joystick/knob controls
+                dx = params.get("dx", 0)
+                dy = params.get("dy", 0)
+                if midi_value is not None:
+                    # Scale based on CC value
+                    scale = (midi_value - 64) / 64.0  # -1.0 to 1.0
+                    self.mouse.move(int(dx * scale), int(dy * scale))
+                else:
+                    self.mouse.move(dx, dy)
+        except Exception as e:
+            print(f"Error executing action {action_type}: {e}", file=sys.stderr)
+
+    def adjust_volume(self, step=5):
+        """Adjusts the system volume up or down."""
+        sign = "+" if step > 0 else "-"
+        abs_step = abs(step)
+        subprocess.run(["amixer", "sset", "Master", f"{abs_step}%{sign}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def set_volume(self, percent):
+        """Sets system volume to a specific percentage."""
+        percent = max(0, min(100, percent))
+        subprocess.run(["amixer", "sset", "Master", f"{percent}%"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def toggle_mute(self):
+        """Toggles system volume mute state."""
+        subprocess.run(["amixer", "sset", "Master", "toggle"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def run_command(self, cmd_str):
+        """Runs a shell command in the background asynchronously."""
+        if not cmd_str:
+            return
+        def target():
+            try:
+                subprocess.run(cmd_str, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception as e:
+                print(f"Failed to run command '{cmd_str}': {e}", file=sys.stderr)
+        threading.Thread(target=target, daemon=True).start()
+
+    def simulate_keypress(self, keys_str):
+        """Simulates a keyboard shortcut. keys_str e.g., 'ctrl+alt+t' or 'space' or 'vol_up'."""
+        if not keys_str:
+            return
+        
+        parts = [p.strip().lower() for p in keys_str.split("+")]
+        keys_to_press = []
+        
+        for part in parts:
+            if part in self._key_map:
+                keys_to_press.append(self._key_map[part])
+            elif len(part) == 1:
+                keys_to_press.append(part)
+            else:
+                # Fallback to single characters if string is just letters
+                for char in part:
+                    keys_to_press.append(char)
+
+        # Press all modifiers and final keys
+        try:
+            for k in keys_to_press:
+                self.keyboard.press(k)
+            # Release in reverse order
+            for k in reversed(keys_to_press):
+                self.keyboard.release(k)
+        except Exception as e:
+            print(f"Error simulating keypress '{keys_str}': {e}", file=sys.stderr)
+
+    def simulate_click(self, btn):
+        """Simulates mouse click."""
+        button = Button.left
+        if btn == "right":
+            button = Button.right
+        elif btn == "middle":
+            button = Button.middle
+        
+        self.mouse.click(button)
