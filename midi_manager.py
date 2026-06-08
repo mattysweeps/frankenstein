@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import threading
-import glob
 import mido
 
 class MidiManager:
@@ -10,7 +9,11 @@ class MidiManager:
         self.on_message_cb = on_message_cb
         self.on_status_cb = on_status_cb
         self.is_connected = False
-        self.current_device = None
+        
+        # Dictionary of active ports: {port_name: port_object}
+        self.open_ports = {}
+        self.ports_lock = threading.Lock()
+        
         self._stop_event = threading.Event()
         self._thread = None
         
@@ -19,16 +22,25 @@ class MidiManager:
         self._learn_lock = threading.Lock()
 
     def start(self):
-        """Starts the MIDI monitor thread."""
+        """Starts the MIDI monitor and autodetect loop."""
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._connection_loop, daemon=True)
+        self._thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self._thread.start()
 
     def stop(self):
-        """Stops the MIDI monitor thread."""
+        """Stops the MIDI monitor loop and closes all ports."""
         self._stop_event.set()
         if self._thread:
             self._thread.join(timeout=1.0)
+        
+        with self.ports_lock:
+            for name, port in list(self.open_ports.items()):
+                try:
+                    port.close()
+                except Exception:
+                    pass
+            self.open_ports.clear()
+            self.is_connected = False
 
     def enable_midi_learn(self, callback):
         """
@@ -43,87 +55,59 @@ class MidiManager:
         with self._learn_lock:
             self._learn_callback = None
 
-    def find_mpk249_device(self):
-        """Dynamically finds the MPK249 ALSA MIDI device path."""
-        # 1. Check /proc/asound/cards to find cards with MPK249 or Akai
-        try:
-            if os.path.exists("/proc/asound/cards"):
-                with open("/proc/asound/cards", "r") as f:
-                    content = f.read()
-                for line in content.splitlines():
-                    if any(term in line.lower() for term in ["mpk249", "akai", "professional"]):
-                        parts = line.strip().split()
-                        if parts and parts[0].isdigit():
-                            card_num = parts[0]
-                            dev_path = f"/dev/snd/midiC{card_num}D0"
-                            if os.path.exists(dev_path):
-                                return dev_path
-        except Exception as e:
-            print(f"Error scanning /proc/asound/cards: {e}", file=sys.stderr)
-
-        # 2. Fallback to searching /dev/snd/midiC*D0
-        try:
-            midi_files = glob.glob("/dev/snd/midiC*D0")
-            if midi_files:
-                # Prioritize card numbers > 0 (which are usually USB midi devices)
-                midi_files.sort(key=lambda x: int(os.path.basename(x).replace("midiC", "").replace("D0", "")), reverse=True)
-                return midi_files[0]
-        except Exception:
-            pass
-
-        # 3. Hardcoded fallback
-        if os.path.exists("/dev/snd/midiC1D0"):
-            return "/dev/snd/midiC1D0"
-
-        return None
-
-    def _connection_loop(self):
-        """Background thread loop to maintain MIDI connection and parse input."""
-        parser = mido.Parser()
-        
+    def _monitor_loop(self):
+        """Background thread loop to dynamically detect, open, and close MIDI ports."""
         while not self._stop_event.is_set():
-            dev_path = self.find_mpk249_device()
-            if not dev_path:
-                if self.is_connected:
-                    self.is_connected = False
-                    self.current_device = None
-                    if self.on_status_cb:
-                        self.on_status_cb(False, None)
-                time.sleep(2.0)
-                continue
-
             try:
-                # Open device file
-                with open(dev_path, "rb") as f:
-                    self.is_connected = True
-                    self.current_device = dev_path
+                # Get all available system MIDI input port names
+                all_inputs = mido.get_input_names()
+            except Exception as e:
+                print(f"Error querying MIDI inputs: {e}", file=sys.stderr)
+                all_inputs = []
+
+            # Filter for ports belonging to the MPK249
+            target_ports = [name for name in all_inputs if any(term in name.lower() for term in ["mpk249", "akai"])]
+            
+            with self.ports_lock:
+                # 1. Close ports that are no longer connected
+                for name in list(self.open_ports.keys()):
+                    if name not in target_ports:
+                        print(f"MIDI | Port disconnected: {name}")
+                        try:
+                            self.open_ports[name].close()
+                        except Exception:
+                            pass
+                        del self.open_ports[name]
+
+                # 2. Open new ports that just connected
+                for name in target_ports:
+                    if name not in self.open_ports:
+                        print(f"MIDI | Attempting to open port: {name}")
+                        try:
+                            # Open port with an asynchronous callback
+                            port = mido.open_input(
+                                name, 
+                                callback=self._handle_midi_message
+                            )
+                            self.open_ports[name] = port
+                            print(f"MIDI | Successfully opened port: {name}")
+                        except Exception as e:
+                            print(f"MIDI | Error opening port {name}: {e}", file=sys.stderr)
+
+                # 3. Update connection status
+                has_ports = len(self.open_ports) > 0
+                if has_ports != self.is_connected:
+                    self.is_connected = has_ports
                     if self.on_status_cb:
-                        self.on_status_cb(True, dev_path)
-                    
-                    # Set non-blocking read with a small sleep or read in chunks
-                    # In Python, reading from /dev/snd/midiC*D0 is blocking unless we use select or read byte-by-byte
-                    # To allow graceful exits, we read 1 byte at a time.
-                    # On Linux, open() on these devices blocks, but since it's a daemon thread,
-                    # it will be killed when main GUI terminates, or we can close the FD to force unblock.
-                    while not self._stop_event.is_set():
-                        data = f.read(1)
-                        if not data:
-                            break
-                        parser.feed(data)
-                        
-                        for msg in parser.iter_pending():
-                            self._handle_midi_message(msg)
-                            
-            except (OSError, PermissionError, IOError) as e:
-                # Connection lost or permission error
-                self.is_connected = False
-                self.current_device = None
-                if self.on_status_cb:
-                    self.on_status_cb(False, None)
-                time.sleep(2.0)
+                        # Display a simplified combined path/name of active devices
+                        paths_summary = ", ".join([n.split(":")[-1] for n in self.open_ports.keys()])
+                        self.on_status_cb(self.is_connected, paths_summary if self.is_connected else None)
+
+            # Check every 2 seconds
+            time.sleep(2.0)
 
     def _handle_midi_message(self, msg):
-        """Dispatches the MIDI message to callbacks."""
+        """Dispatches incoming MIDI messages from opened ports."""
         control_id = None
         val = None
         
@@ -148,11 +132,14 @@ class MidiManager:
         with self._learn_lock:
             if self._learn_callback:
                 cb = self._learn_callback
-                # Disable learn mode automatically on first received control message
                 self._learn_callback = None
                 
-                # Execute in thread safety
-                threading.Thread(target=cb, args=(control_id, msg.type, getattr(msg, 'channel', 0)), daemon=True).start()
+                # Execute learn callback in a separate thread so it doesn't block the MIDI thread
+                threading.Thread(
+                    target=cb, 
+                    args=(control_id, msg.type, getattr(msg, 'channel', 0)), 
+                    daemon=True
+                ).start()
                 return
 
         # Regular Message Callback
