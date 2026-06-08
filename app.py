@@ -416,6 +416,16 @@ class Mpk249App(ctk.CTk):
         # Debounce: Schedule redraw to fire after a 50ms pause in resizing
         self._resize_after_id = self.after(50, self.execute_resize_redraw)
 
+    def force_customtkinter_redraw(self, widget):
+        """Recursively forces all CustomTkinter widgets in the tree to redraw immediately."""
+        if hasattr(widget, "_draw"):
+            try:
+                widget._draw()
+            except Exception:
+                pass
+        for child in widget.winfo_children():
+            self.force_customtkinter_redraw(child)
+
     def execute_resize_redraw(self):
         """Executes the actual canvas redrawing using stored width and height dimensions."""
         self._resize_after_id = None
@@ -431,8 +441,11 @@ class Mpk249App(ctk.CTk):
         if self.selected_canvas_control_id:
             self.highlight_canvas_control(self.selected_canvas_control_id)
 
-        # Force immediate window refresh to avoid hover rendering issues
-        self.update_idletasks()
+        # Force full Tkinter geometry and layout update
+        self.update()
+        
+        # Force all CustomTkinter elements in the app to redraw to bypass Linux Wayland render bugs
+        self.force_customtkinter_redraw(self)
 
     def draw_keyboard_schematic(self, width=None, height=None):
         """Draws the vector schematic dynamically scaled to the specified dimensions."""
