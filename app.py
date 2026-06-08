@@ -408,16 +408,30 @@ class Mpk249App(ctk.CTk):
                 self.after_cancel(self._resize_after_id)
             except Exception:
                 pass
+
+        if hasattr(self, "_resize_extra_ids") and self._resize_extra_ids:
+            for extra_id in self._resize_extra_ids:
+                try:
+                    self.after_cancel(extra_id)
+                except Exception:
+                    pass
+            self._resize_extra_ids.clear()
+        else:
+            self._resize_extra_ids = []
             
         # Store latest sizes
         self._last_resize_w = event.width
         self._last_resize_h = event.height
         
-        # Debounce: Schedule redraw to fire after a 50ms pause in resizing
-        self._resize_after_id = self.after(50, self.execute_resize_redraw)
+        # Debounce: Schedule redraw to fire after a 100ms pause in resizing
+        self._resize_after_id = self.after(100, lambda: self.execute_resize_redraw(is_followup=False))
 
     def force_customtkinter_redraw(self, widget):
-        """Recursively forces all CustomTkinter widgets in the tree to redraw immediately."""
+        """Recursively forces all viewable CustomTkinter widgets in the tree to redraw immediately."""
+        # Only traverse and draw viewable widgets if the root window itself is viewable (startup check bypass)
+        if self.winfo_viewable() and not widget.winfo_viewable():
+            return
+            
         if hasattr(widget, "_draw"):
             try:
                 widget._draw()
@@ -426,7 +440,7 @@ class Mpk249App(ctk.CTk):
         for child in widget.winfo_children():
             self.force_customtkinter_redraw(child)
 
-    def execute_resize_redraw(self):
+    def execute_resize_redraw(self, is_followup=False):
         """Executes the actual canvas redrawing using stored width and height dimensions."""
         self._resize_after_id = None
         w = getattr(self, "_last_resize_w", None)
@@ -446,6 +460,22 @@ class Mpk249App(ctk.CTk):
         
         # Force all CustomTkinter elements in the app to redraw to bypass Linux Wayland render bugs
         self.force_customtkinter_redraw(self)
+
+        # Schedule follow-up redraws to handle slow window manager animations (e.g. fullscreen transition)
+        if not is_followup:
+            if hasattr(self, "_resize_extra_ids") and self._resize_extra_ids:
+                for extra_id in self._resize_extra_ids:
+                    try:
+                        self.after_cancel(extra_id)
+                    except Exception:
+                        pass
+                self._resize_extra_ids.clear()
+            else:
+                self._resize_extra_ids = []
+
+            # Schedule redraws at 200ms and 500ms to guarantee rendering after animations stabilize
+            self._resize_extra_ids.append(self.after(200, lambda: self.execute_resize_redraw(is_followup=True)))
+            self._resize_extra_ids.append(self.after(500, lambda: self.execute_resize_redraw(is_followup=True)))
 
     def draw_keyboard_schematic(self, width=None, height=None):
         """Draws the vector schematic dynamically scaled to the specified dimensions."""
