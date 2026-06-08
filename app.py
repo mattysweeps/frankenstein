@@ -65,13 +65,24 @@ class Mpk249App(ctk.CTk):
         self.selected_mapping_key = None  # Key currently selected for editing
         self.selected_canvas_control_id = None # Selected control on the visual schematic
 
+        # Query current system volume to initialize volume control positions accurately
+        initial_vol = 50
+        try:
+            initial_vol = self.action_handler.get_volume()
+        except Exception as e:
+            logging.warning(f"Could not query initial system volume: {e}")
+            
+        initial_midi_val = int((initial_vol / 100.0) * 127)
+
         # Initialize default control values database
         self.control_values = {}
-        for cc in range(12, 20): self.control_values[f"cc:{cc}"] = 0
+        for cc in range(12, 20): 
+            # Default Fader 1 (cc:12) to current system volume
+            self.control_values[f"cc:{cc}"] = initial_midi_val if cc == 12 else 0
         for cc in range(22, 30): self.control_values[f"cc:{cc}"] = 0
         for cc in range(32, 40): self.control_values[f"cc:{cc}"] = 0
         for cc in [114, 115, 116, 117, 118, 119]: self.control_values[f"cc:{cc}"] = 0
-        self.control_values["cc:1"] = 0
+        self.control_values["cc:1"] = initial_midi_val # Modulation wheel starts at current system volume
         self.control_values["pitchwheel"] = 0
 
         # Saved scale parameters (defaults)
