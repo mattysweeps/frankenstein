@@ -26,6 +26,7 @@ A beautiful, premium, and lightweight GUI application written in Python using Cu
 * [midi_manager.py](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/midi_manager.py) — Handles dynamic MIDI device port detection, background monitoring, and MIDI Learn mode.
 * [action_handler.py](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/action_handler.py) — Simulates mouse/keyboard commands and system audio changes (platform-agnostic).
 * [config.json](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/config.json) — Local configuration file containing active presets and user-customized mappings.
+* [disable_autosuspend.sh](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/disable_autosuspend.sh) — Linux-only helper script to disable USB autosuspend power-saving features.
 * [requirements.txt](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/requirements.txt) — Python dependencies with environment markers for cross-platform installations.
 * [run.sh](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/run.sh) — Multi-platform launcher script.
 
@@ -36,10 +37,19 @@ A beautiful, premium, and lightweight GUI application written in Python using Cu
 ### 🐧 On Linux
 
 1. **Install dependencies**:
+   Run the following apt command to install sound and GUI system headers:
    ```bash
+   sudo apt-get update
    sudo apt-get install -y libasound2-dev pkg-config python3-tk
    ```
-2. **Run the launcher**:
+2. **Configure USB Hub Power / Autosuspend (Highly Recommended)**:
+   If your MPK249 is connected through a USB hub, Linux may put the hub port to sleep (suspend mode), dropping all MIDI signals.
+   * Connect your MPK249 to the USB hub.
+   * Run the power-management fix script:
+     ```bash
+     sudo ./disable_autosuspend.sh
+     ```
+3. **Run the launcher**:
    ```bash
    ./run.sh
    ```
