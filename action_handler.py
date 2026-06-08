@@ -1,6 +1,7 @@
 import subprocess
 import os
 import sys
+import platform
 import threading
 from pynput.keyboard import Controller as KeyboardController, Key
 from pynput.mouse import Controller as MouseController, Button
@@ -9,6 +10,10 @@ class ActionHandler:
     def __init__(self):
         self.keyboard = KeyboardController()
         self.mouse = MouseController()
+        
+        # Check system platform
+        self.is_mac = (platform.system() == "Darwin")
+        
         self._key_map = {
             "enter": Key.enter,
             "space": Key.space,
@@ -29,10 +34,12 @@ class ActionHandler:
             "ctrl": Key.ctrl,
             "control": Key.ctrl,
             "alt": Key.alt,
+            "option": Key.alt, # macOS option key
             "super": Key.cmd,
             "meta": Key.cmd,
             "win": Key.cmd,
             "cmd": Key.cmd,
+            "command": Key.cmd, # macOS command key
             "f1": Key.f1,
             "f2": Key.f2,
             "f3": Key.f3,
@@ -81,21 +88,14 @@ class ActionHandler:
                 self.run_command(cmd_str)
             elif action_type == "mouse_scroll":
                 amount = params.get("amount", 1)
-                # If MIDI value is provided, we can scroll proportionally or just scroll on triggers
-                if midi_value is not None:
-                    # Example: scroll amount depends on value change, or simple direction
-                    pass
-                else:
-                    self.mouse.scroll(0, amount)
+                self.mouse.scroll(0, amount)
             elif action_type == "mouse_click":
                 btn = params.get("button", "left").lower()
                 self.simulate_click(btn)
             elif action_type == "mouse_move":
-                # For continuous joystick/knob controls
                 dx = params.get("dx", 0)
                 dy = params.get("dy", 0)
                 if midi_value is not None:
-                    # Scale based on CC value
                     scale = (midi_value - 64) / 64.0  # -1.0 to 1.0
                     self.mouse.move(int(dx * scale), int(dy * scale))
                 else:
@@ -105,18 +105,40 @@ class ActionHandler:
 
     def adjust_volume(self, step=5):
         """Adjusts the system volume up or down."""
-        sign = "+" if step > 0 else "-"
-        abs_step = abs(step)
-        subprocess.run(["amixer", "sset", "Master", f"{abs_step}%{sign}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if self.is_mac:
+            # Adjust volume on macOS using AppleScript
+            # Bound output volume settings (0 to 100)
+            cmd = (
+                'osascript -e "set volume output volume '
+                '((output volume of (get volume settings)) + {})"'.format(step)
+            )
+            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            # Adjust volume on Linux using ALSA amixer
+            sign = "+" if step > 0 else "-"
+            abs_step = abs(step)
+            subprocess.run(["amixer", "sset", "Master", f"{abs_step}%{sign}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def set_volume(self, percent):
-        """Sets system volume to a specific percentage."""
+        """Sets system volume to a specific percentage (0-100)."""
         percent = max(0, min(100, percent))
-        subprocess.run(["amixer", "sset", "Master", f"{percent}%"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if self.is_mac:
+            # Set volume on macOS using AppleScript
+            cmd = f'osascript -e "set volume output volume {percent}"'
+            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            # Set volume on Linux using ALSA amixer
+            subprocess.run(["amixer", "sset", "Master", f"{percent}%"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def toggle_mute(self):
         """Toggles system volume mute state."""
-        subprocess.run(["amixer", "sset", "Master", "toggle"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if self.is_mac:
+            # Toggle mute on macOS using AppleScript
+            cmd = 'osascript -e "set volume output muted not (output muted of (get volume settings))"'
+            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            # Toggle mute on Linux using ALSA amixer
+            subprocess.run(["amixer", "sset", "Master", "toggle"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def run_command(self, cmd_str):
         """Runs a shell command in the background asynchronously."""
@@ -130,7 +152,7 @@ class ActionHandler:
         threading.Thread(target=target, daemon=True).start()
 
     def simulate_keypress(self, keys_str):
-        """Simulates a keyboard shortcut. keys_str e.g., 'ctrl+alt+t' or 'space' or 'vol_up'."""
+        """Simulates a keyboard shortcut (e.g. 'ctrl+alt+t' or 'cmd+space' or 'volume_up')."""
         if not keys_str:
             return
         
@@ -143,15 +165,12 @@ class ActionHandler:
             elif len(part) == 1:
                 keys_to_press.append(part)
             else:
-                # Fallback to single characters if string is just letters
                 for char in part:
                     keys_to_press.append(char)
 
-        # Press all modifiers and final keys
         try:
             for k in keys_to_press:
                 self.keyboard.press(k)
-            # Release in reverse order
             for k in reversed(keys_to_press):
                 self.keyboard.release(k)
         except Exception as e:

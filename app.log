@@ -1,158 +1,40 @@
-2026-06-07 21:21:03,426 [INFO] (MainThread) Initializing MPK249 Control Center App
-2026-06-07 21:21:03,432 [INFO] (MainThread) Loading config from /home/mattysweeps/src/github.com/mattysweeps/frankenstein/config.json
-2026-06-07 21:21:03,433 [INFO] (MainThread) Config loaded successfully
-2026-06-07 21:21:03,433 [DEBUG] (MainThread) Setting up GUI widgets
-2026-06-07 21:21:03,636 [DEBUG] (MainThread) Action type dropdown selection changed to volume_set
-2026-06-07 21:21:03,650 [INFO] (MainThread) Starting MidiManager threads
-2026-06-07 21:21:03,650 [INFO] (MidiMonitorThread) Entering MidiManager monitor loop
-2026-06-07 21:21:03,650 [DEBUG] (MainThread) Redrawing mappings scroll container list
-2026-06-07 21:21:03,654 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:03,654 [INFO] (MidiMonitorThread) Attempting to open port: MPK249:MPK249 Port A 20:0
-2026-06-07 21:21:03,654 [INFO] (MidiMonitorThread) Successfully opened port: MPK249:MPK249 Port A 20:0
-2026-06-07 21:21:03,654 [INFO] (MidiMonitorThread) Attempting to open port: MPK249:MPK249 Port B 20:1
-2026-06-07 21:21:03,655 [INFO] (MidiMonitorThread) Successfully opened port: MPK249:MPK249 Port B 20:1
-2026-06-07 21:21:03,655 [INFO] (MidiMonitorThread) Attempting to open port: MPK249:MPK249 MIDI 20:2
-2026-06-07 21:21:03,656 [INFO] (MidiMonitorThread) Successfully opened port: MPK249:MPK249 MIDI 20:2
-2026-06-07 21:21:03,656 [INFO] (MidiMonitorThread) Attempting to open port: MPK249:MPK249 Remote 20:3
-2026-06-07 21:21:03,656 [INFO] (MidiMonitorThread) Successfully opened port: MPK249:MPK249 Remote 20:3
-2026-06-07 21:21:03,656 [INFO] (MidiMonitorThread) Connection status changed. Connected: True
-2026-06-07 21:21:03,998 [INFO] (MainThread) System status change: Connected to 0, 1, 2, 3
-2026-06-07 21:21:05,997 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:08,002 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:10,003 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:12,004 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
-2026-06-07 21:21:12,004 [WARNING] (MidiMonitorThread) Port disconnected: MPK249:MPK249 Port A 20:0
-2026-06-07 21:21:12,005 [WARNING] (MidiMonitorThread) Port disconnected: MPK249:MPK249 Port B 20:1
-2026-06-07 21:21:12,005 [WARNING] (MidiMonitorThread) Port disconnected: MPK249:MPK249 MIDI 20:2
-2026-06-07 21:21:12,005 [WARNING] (MidiMonitorThread) Port disconnected: MPK249:MPK249 Remote 20:3
-2026-06-07 21:21:12,005 [INFO] (MidiMonitorThread) Connection status changed. Connected: False
-2026-06-07 21:21:12,006 [WARNING] (MainThread) System status change: Disconnected
-2026-06-07 21:21:14,008 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
-2026-06-07 21:21:16,009 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
-2026-06-07 21:21:18,011 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
-2026-06-07 21:21:20,013 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:20,013 [INFO] (MidiMonitorThread) Attempting to open port: MPK249:MPK249 Port A 20:0
-2026-06-07 21:21:20,014 [INFO] (MidiMonitorThread) Successfully opened port: MPK249:MPK249 Port A 20:0
-2026-06-07 21:21:20,014 [INFO] (MidiMonitorThread) Attempting to open port: MPK249:MPK249 Port B 20:1
-2026-06-07 21:21:20,014 [INFO] (MidiMonitorThread) Successfully opened port: MPK249:MPK249 Port B 20:1
-2026-06-07 21:21:20,014 [INFO] (MidiMonitorThread) Attempting to open port: MPK249:MPK249 MIDI 20:2
-2026-06-07 21:21:20,015 [INFO] (MidiMonitorThread) Successfully opened port: MPK249:MPK249 MIDI 20:2
-2026-06-07 21:21:20,015 [INFO] (MidiMonitorThread) Attempting to open port: MPK249:MPK249 Remote 20:3
-2026-06-07 21:21:20,015 [INFO] (MidiMonitorThread) Successfully opened port: MPK249:MPK249 Remote 20:3
-2026-06-07 21:21:20,016 [INFO] (MidiMonitorThread) Connection status changed. Connected: True
-2026-06-07 21:21:20,017 [INFO] (MainThread) System status change: Connected to 0, 1, 2, 3
-2026-06-07 21:21:20,922 [DEBUG] (Dummy-1) Raw MIDI message received in callback thread: note_on channel=0 note=57 velocity=127 time=0
-2026-06-07 21:21:20,922 [DEBUG] (Dummy-1) Received MIDI Event -> Control ID: note:57, Value: 127, Raw Msg: note_on channel=0 note=57 velocity=127 time=0
-2026-06-07 21:21:20,960 [DEBUG] (Dummy-2) Raw MIDI message received in callback thread: note_on channel=0 note=48 velocity=91 time=0
-2026-06-07 21:21:20,960 [DEBUG] (Dummy-2) Received MIDI Event -> Control ID: note:48, Value: 91, Raw Msg: note_on channel=0 note=48 velocity=91 time=0
-2026-06-07 21:21:21,223 [DEBUG] (Dummy-3) Raw MIDI message received in callback thread: note_off channel=0 note=57 velocity=0 time=0
-2026-06-07 21:21:21,223 [DEBUG] (Dummy-3) Received MIDI Event -> Control ID: note:57, Value: 0, Raw Msg: note_off channel=0 note=57 velocity=0 time=0
-2026-06-07 21:21:21,246 [DEBUG] (Dummy-4) Raw MIDI message received in callback thread: note_off channel=0 note=48 velocity=0 time=0
-2026-06-07 21:21:21,246 [DEBUG] (Dummy-4) Received MIDI Event -> Control ID: note:48, Value: 0, Raw Msg: note_off channel=0 note=48 velocity=0 time=0
-2026-06-07 21:21:21,774 [DEBUG] (Dummy-5) Raw MIDI message received in callback thread: note_on channel=0 note=45 velocity=69 time=0
-2026-06-07 21:21:21,774 [DEBUG] (Dummy-5) Received MIDI Event -> Control ID: note:45, Value: 69, Raw Msg: note_on channel=0 note=45 velocity=69 time=0
-2026-06-07 21:21:21,810 [DEBUG] (Dummy-6) Raw MIDI message received in callback thread: note_on channel=0 note=64 velocity=71 time=0
-2026-06-07 21:21:21,810 [DEBUG] (Dummy-6) Received MIDI Event -> Control ID: note:64, Value: 71, Raw Msg: note_on channel=0 note=64 velocity=71 time=0
-2026-06-07 21:21:21,830 [DEBUG] (Dummy-7) Raw MIDI message received in callback thread: note_on channel=0 note=71 velocity=65 time=0
-2026-06-07 21:21:21,830 [DEBUG] (Dummy-7) Received MIDI Event -> Control ID: note:71, Value: 65, Raw Msg: note_on channel=0 note=71 velocity=65 time=0
-2026-06-07 21:21:21,842 [DEBUG] (Dummy-8) Raw MIDI message received in callback thread: note_on channel=0 note=52 velocity=37 time=0
-2026-06-07 21:21:21,843 [DEBUG] (Dummy-8) Received MIDI Event -> Control ID: note:52, Value: 37, Raw Msg: note_on channel=0 note=52 velocity=37 time=0
-2026-06-07 21:21:21,845 [DEBUG] (Dummy-9) Raw MIDI message received in callback thread: note_on channel=0 note=50 velocity=42 time=0
-2026-06-07 21:21:21,845 [DEBUG] (Dummy-9) Received MIDI Event -> Control ID: note:50, Value: 42, Raw Msg: note_on channel=0 note=50 velocity=42 time=0
-2026-06-07 21:21:21,901 [DEBUG] (Dummy-10) Raw MIDI message received in callback thread: note_off channel=0 note=50 velocity=0 time=0
-2026-06-07 21:21:21,901 [DEBUG] (Dummy-10) Received MIDI Event -> Control ID: note:50, Value: 0, Raw Msg: note_off channel=0 note=50 velocity=0 time=0
-2026-06-07 21:21:21,905 [DEBUG] (Dummy-11) Raw MIDI message received in callback thread: note_off channel=0 note=52 velocity=0 time=0
-2026-06-07 21:21:21,905 [DEBUG] (Dummy-11) Received MIDI Event -> Control ID: note:52, Value: 0, Raw Msg: note_off channel=0 note=52 velocity=0 time=0
-2026-06-07 21:21:21,934 [DEBUG] (Dummy-12) Raw MIDI message received in callback thread: note_off channel=0 note=71 velocity=0 time=0
-2026-06-07 21:21:21,934 [DEBUG] (Dummy-12) Received MIDI Event -> Control ID: note:71, Value: 0, Raw Msg: note_off channel=0 note=71 velocity=0 time=0
-2026-06-07 21:21:21,955 [DEBUG] (Dummy-13) Raw MIDI message received in callback thread: note_off channel=0 note=64 velocity=0 time=0
-2026-06-07 21:21:21,955 [DEBUG] (Dummy-13) Received MIDI Event -> Control ID: note:64, Value: 0, Raw Msg: note_off channel=0 note=64 velocity=0 time=0
-2026-06-07 21:21:21,981 [DEBUG] (Dummy-14) Raw MIDI message received in callback thread: note_off channel=0 note=45 velocity=0 time=0
-2026-06-07 21:21:21,981 [DEBUG] (Dummy-14) Received MIDI Event -> Control ID: note:45, Value: 0, Raw Msg: note_off channel=0 note=45 velocity=0 time=0
-2026-06-07 21:21:22,017 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:22,146 [DEBUG] (Dummy-15) Raw MIDI message received in callback thread: note_on channel=0 note=69 velocity=87 time=0
-2026-06-07 21:21:22,146 [DEBUG] (Dummy-15) Received MIDI Event -> Control ID: note:69, Value: 87, Raw Msg: note_on channel=0 note=69 velocity=87 time=0
-2026-06-07 21:21:22,247 [DEBUG] (Dummy-16) Raw MIDI message received in callback thread: note_on channel=0 note=67 velocity=99 time=0
-2026-06-07 21:21:22,247 [DEBUG] (Dummy-16) Received MIDI Event -> Control ID: note:67, Value: 99, Raw Msg: note_on channel=0 note=67 velocity=99 time=0
-2026-06-07 21:21:22,248 [DEBUG] (Dummy-17) Raw MIDI message received in callback thread: note_on channel=0 note=45 velocity=38 time=0
-2026-06-07 21:21:22,248 [DEBUG] (Dummy-17) Received MIDI Event -> Control ID: note:45, Value: 38, Raw Msg: note_on channel=0 note=45 velocity=38 time=0
-2026-06-07 21:21:22,317 [DEBUG] (Dummy-18) Raw MIDI message received in callback thread: note_on channel=0 note=47 velocity=68 time=0
-2026-06-07 21:21:22,317 [DEBUG] (Dummy-18) Received MIDI Event -> Control ID: note:47, Value: 68, Raw Msg: note_on channel=0 note=47 velocity=68 time=0
-2026-06-07 21:21:22,368 [DEBUG] (Dummy-19) Raw MIDI message received in callback thread: note_on channel=0 note=48 velocity=92 time=0
-2026-06-07 21:21:22,368 [DEBUG] (Dummy-19) Received MIDI Event -> Control ID: note:48, Value: 92, Raw Msg: note_on channel=0 note=48 velocity=92 time=0
-2026-06-07 21:21:22,371 [DEBUG] (Dummy-20) Raw MIDI message received in callback thread: note_off channel=0 note=45 velocity=0 time=0
-2026-06-07 21:21:22,371 [DEBUG] (Dummy-20) Received MIDI Event -> Control ID: note:45, Value: 0, Raw Msg: note_off channel=0 note=45 velocity=0 time=0
-2026-06-07 21:21:22,372 [DEBUG] (Dummy-21) Raw MIDI message received in callback thread: note_on channel=0 note=65 velocity=81 time=0
-2026-06-07 21:21:22,373 [DEBUG] (Dummy-21) Received MIDI Event -> Control ID: note:65, Value: 81, Raw Msg: note_on channel=0 note=65 velocity=81 time=0
-2026-06-07 21:21:22,398 [DEBUG] (Dummy-22) Raw MIDI message received in callback thread: note_off channel=0 note=69 velocity=0 time=0
-2026-06-07 21:21:22,398 [DEBUG] (Dummy-22) Received MIDI Event -> Control ID: note:69, Value: 0, Raw Msg: note_off channel=0 note=69 velocity=0 time=0
-2026-06-07 21:21:22,468 [DEBUG] (Dummy-23) Raw MIDI message received in callback thread: note_on channel=0 note=50 velocity=85 time=0
-2026-06-07 21:21:22,468 [DEBUG] (Dummy-23) Received MIDI Event -> Control ID: note:50, Value: 85, Raw Msg: note_on channel=0 note=50 velocity=85 time=0
-2026-06-07 21:21:22,478 [DEBUG] (Dummy-24) Raw MIDI message received in callback thread: note_off channel=0 note=47 velocity=0 time=0
-2026-06-07 21:21:22,478 [DEBUG] (Dummy-24) Received MIDI Event -> Control ID: note:47, Value: 0, Raw Msg: note_off channel=0 note=47 velocity=0 time=0
-2026-06-07 21:21:22,507 [DEBUG] (Dummy-25) Raw MIDI message received in callback thread: note_off channel=0 note=67 velocity=0 time=0
-2026-06-07 21:21:22,507 [DEBUG] (Dummy-25) Received MIDI Event -> Control ID: note:67, Value: 0, Raw Msg: note_off channel=0 note=67 velocity=0 time=0
-2026-06-07 21:21:22,537 [DEBUG] (Dummy-26) Raw MIDI message received in callback thread: note_off channel=0 note=48 velocity=0 time=0
-2026-06-07 21:21:22,537 [DEBUG] (Dummy-26) Received MIDI Event -> Control ID: note:48, Value: 0, Raw Msg: note_off channel=0 note=48 velocity=0 time=0
-2026-06-07 21:21:22,581 [DEBUG] (Dummy-27) Raw MIDI message received in callback thread: note_off channel=0 note=65 velocity=0 time=0
-2026-06-07 21:21:22,581 [DEBUG] (Dummy-27) Received MIDI Event -> Control ID: note:65, Value: 0, Raw Msg: note_off channel=0 note=65 velocity=0 time=0
-2026-06-07 21:21:22,598 [DEBUG] (Dummy-28) Raw MIDI message received in callback thread: note_off channel=0 note=50 velocity=0 time=0
-2026-06-07 21:21:22,598 [DEBUG] (Dummy-28) Received MIDI Event -> Control ID: note:50, Value: 0, Raw Msg: note_off channel=0 note=50 velocity=0 time=0
-2026-06-07 21:21:22,600 [DEBUG] (Dummy-29) Raw MIDI message received in callback thread: note_on channel=0 note=64 velocity=84 time=0
-2026-06-07 21:21:22,600 [DEBUG] (Dummy-29) Received MIDI Event -> Control ID: note:64, Value: 84, Raw Msg: note_on channel=0 note=64 velocity=84 time=0
-2026-06-07 21:21:22,731 [DEBUG] (Dummy-30) Raw MIDI message received in callback thread: note_on channel=0 note=45 velocity=64 time=0
-2026-06-07 21:21:22,731 [DEBUG] (Dummy-30) Received MIDI Event -> Control ID: note:45, Value: 64, Raw Msg: note_on channel=0 note=45 velocity=64 time=0
-2026-06-07 21:21:22,735 [DEBUG] (Dummy-31) Raw MIDI message received in callback thread: note_off channel=0 note=64 velocity=0 time=0
-2026-06-07 21:21:22,735 [DEBUG] (Dummy-31) Received MIDI Event -> Control ID: note:64, Value: 0, Raw Msg: note_off channel=0 note=64 velocity=0 time=0
-2026-06-07 21:21:22,887 [DEBUG] (Dummy-32) Raw MIDI message received in callback thread: note_off channel=0 note=45 velocity=0 time=0
-2026-06-07 21:21:22,887 [DEBUG] (Dummy-32) Received MIDI Event -> Control ID: note:45, Value: 0, Raw Msg: note_off channel=0 note=45 velocity=0 time=0
-2026-06-07 21:21:23,056 [DEBUG] (Dummy-33) Raw MIDI message received in callback thread: note_on channel=0 note=50 velocity=79 time=0
-2026-06-07 21:21:23,056 [DEBUG] (Dummy-33) Received MIDI Event -> Control ID: note:50, Value: 79, Raw Msg: note_on channel=0 note=50 velocity=79 time=0
-2026-06-07 21:21:23,148 [DEBUG] (Dummy-34) Raw MIDI message received in callback thread: note_off channel=0 note=50 velocity=0 time=0
-2026-06-07 21:21:23,148 [DEBUG] (Dummy-34) Received MIDI Event -> Control ID: note:50, Value: 0, Raw Msg: note_off channel=0 note=50 velocity=0 time=0
-2026-06-07 21:21:23,173 [DEBUG] (Dummy-35) Raw MIDI message received in callback thread: note_on channel=0 note=65 velocity=86 time=0
-2026-06-07 21:21:23,173 [DEBUG] (Dummy-35) Received MIDI Event -> Control ID: note:65, Value: 86, Raw Msg: note_on channel=0 note=65 velocity=86 time=0
-2026-06-07 21:21:23,331 [DEBUG] (Dummy-36) Raw MIDI message received in callback thread: note_off channel=0 note=65 velocity=0 time=0
-2026-06-07 21:21:23,331 [DEBUG] (Dummy-36) Received MIDI Event -> Control ID: note:65, Value: 0, Raw Msg: note_off channel=0 note=65 velocity=0 time=0
-2026-06-07 21:21:23,365 [DEBUG] (Dummy-37) Raw MIDI message received in callback thread: note_on channel=0 note=50 velocity=55 time=0
-2026-06-07 21:21:23,365 [DEBUG] (Dummy-37) Received MIDI Event -> Control ID: note:50, Value: 55, Raw Msg: note_on channel=0 note=50 velocity=55 time=0
-2026-06-07 21:21:23,438 [DEBUG] (Dummy-38) Raw MIDI message received in callback thread: note_on channel=0 note=69 velocity=38 time=0
-2026-06-07 21:21:23,438 [DEBUG] (Dummy-38) Received MIDI Event -> Control ID: note:69, Value: 38, Raw Msg: note_on channel=0 note=69 velocity=38 time=0
-2026-06-07 21:21:23,460 [DEBUG] (Dummy-39) Raw MIDI message received in callback thread: note_off channel=0 note=50 velocity=0 time=0
-2026-06-07 21:21:23,460 [DEBUG] (Dummy-39) Received MIDI Event -> Control ID: note:50, Value: 0, Raw Msg: note_off channel=0 note=50 velocity=0 time=0
-2026-06-07 21:21:23,544 [DEBUG] (Dummy-40) Raw MIDI message received in callback thread: note_on channel=0 note=67 velocity=96 time=0
-2026-06-07 21:21:23,544 [DEBUG] (Dummy-40) Received MIDI Event -> Control ID: note:67, Value: 96, Raw Msg: note_on channel=0 note=67 velocity=96 time=0
-2026-06-07 21:21:23,592 [DEBUG] (Dummy-41) Raw MIDI message received in callback thread: note_on channel=0 note=47 velocity=86 time=0
-2026-06-07 21:21:23,592 [DEBUG] (Dummy-41) Received MIDI Event -> Control ID: note:47, Value: 86, Raw Msg: note_on channel=0 note=47 velocity=86 time=0
-2026-06-07 21:21:23,674 [DEBUG] (Dummy-42) Raw MIDI message received in callback thread: note_on channel=0 note=65 velocity=75 time=0
-2026-06-07 21:21:23,674 [DEBUG] (Dummy-42) Received MIDI Event -> Control ID: note:65, Value: 75, Raw Msg: note_on channel=0 note=65 velocity=75 time=0
-2026-06-07 21:21:23,692 [DEBUG] (Dummy-43) Raw MIDI message received in callback thread: note_on channel=0 note=48 velocity=118 time=0
-2026-06-07 21:21:23,692 [DEBUG] (Dummy-43) Received MIDI Event -> Control ID: note:48, Value: 118, Raw Msg: note_on channel=0 note=48 velocity=118 time=0
-2026-06-07 21:21:23,722 [DEBUG] (Dummy-44) Raw MIDI message received in callback thread: note_off channel=0 note=69 velocity=0 time=0
-2026-06-07 21:21:23,722 [DEBUG] (Dummy-44) Received MIDI Event -> Control ID: note:69, Value: 0, Raw Msg: note_off channel=0 note=69 velocity=0 time=0
-2026-06-07 21:21:23,756 [DEBUG] (Dummy-45) Raw MIDI message received in callback thread: note_on channel=0 note=72 velocity=94 time=0
-2026-06-07 21:21:23,756 [DEBUG] (Dummy-45) Received MIDI Event -> Control ID: note:72, Value: 94, Raw Msg: note_on channel=0 note=72 velocity=94 time=0
-2026-06-07 21:21:23,774 [DEBUG] (Dummy-46) Raw MIDI message received in callback thread: note_off channel=0 note=67 velocity=0 time=0
-2026-06-07 21:21:23,774 [DEBUG] (Dummy-46) Received MIDI Event -> Control ID: note:67, Value: 0, Raw Msg: note_off channel=0 note=67 velocity=0 time=0
-2026-06-07 21:21:23,804 [DEBUG] (Dummy-47) Raw MIDI message received in callback thread: note_off channel=0 note=65 velocity=0 time=0
-2026-06-07 21:21:23,804 [DEBUG] (Dummy-47) Received MIDI Event -> Control ID: note:65, Value: 0, Raw Msg: note_off channel=0 note=65 velocity=0 time=0
-2026-06-07 21:21:23,823 [DEBUG] (Dummy-48) Raw MIDI message received in callback thread: note_off channel=0 note=47 velocity=0 time=0
-2026-06-07 21:21:23,823 [DEBUG] (Dummy-48) Received MIDI Event -> Control ID: note:47, Value: 0, Raw Msg: note_off channel=0 note=47 velocity=0 time=0
-2026-06-07 21:21:23,852 [DEBUG] (Dummy-49) Raw MIDI message received in callback thread: note_off channel=0 note=48 velocity=0 time=0
-2026-06-07 21:21:23,852 [DEBUG] (Dummy-49) Received MIDI Event -> Control ID: note:48, Value: 0, Raw Msg: note_off channel=0 note=48 velocity=0 time=0
-2026-06-07 21:21:23,885 [DEBUG] (Dummy-50) Raw MIDI message received in callback thread: note_off channel=0 note=72 velocity=0 time=0
-2026-06-07 21:21:23,885 [DEBUG] (Dummy-50) Received MIDI Event -> Control ID: note:72, Value: 0, Raw Msg: note_off channel=0 note=72 velocity=0 time=0
-2026-06-07 21:21:24,017 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:26,019 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:28,020 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:30,021 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:32,022 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:34,023 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:36,024 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:38,025 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:40,026 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:42,027 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:44,028 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:46,029 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:48,030 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
-2026-06-07 21:21:50,031 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0', 'MPK249:MPK249 Port A 20:0', 'MPK249:MPK249 Port B 20:1', 'MPK249:MPK249 MIDI 20:2', 'MPK249:MPK249 Remote 20:3']
+2026-06-07 21:22:16,456 [INFO] (MainThread) Initializing MPK249 Control Center App
+2026-06-07 21:22:16,462 [INFO] (MainThread) Loading config from /home/mattysweeps/src/github.com/mattysweeps/frankenstein/config.json
+2026-06-07 21:22:16,463 [INFO] (MainThread) Config loaded successfully
+2026-06-07 21:22:16,463 [DEBUG] (MainThread) Setting up GUI widgets
+2026-06-07 21:22:16,675 [DEBUG] (MainThread) Action type dropdown selection changed to volume_set
+2026-06-07 21:22:16,689 [INFO] (MainThread) Starting MidiManager threads
+2026-06-07 21:22:16,689 [INFO] (MidiMonitorThread) Entering MidiManager monitor loop
+2026-06-07 21:22:16,690 [DEBUG] (MainThread) Redrawing mappings scroll container list
+2026-06-07 21:22:16,693 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:18,696 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:20,697 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:22,698 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:24,699 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:26,699 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:28,702 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:30,703 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:32,705 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:34,707 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:36,709 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:38,710 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:40,711 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:42,714 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:44,717 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:46,720 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:48,722 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:50,725 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:52,726 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:54,728 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:56,730 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:58,305 [INFO] (MainThread) Enabling MIDI learn mode
+2026-06-07 21:22:58,306 [INFO] (MainThread) MIDI Learn enabled
+2026-06-07 21:22:58,733 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:22:59,947 [INFO] (MainThread) Enabling MIDI learn mode
+2026-06-07 21:22:59,949 [INFO] (MainThread) MIDI Learn enabled
+2026-06-07 21:23:00,735 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:23:01,523 [DEBUG] (MainThread) Action type dropdown selection changed to volume_set
+2026-06-07 21:23:01,525 [INFO] (MainThread) MIDI Learn disabled
+2026-06-07 21:23:02,737 [DEBUG] (MidiMonitorThread) Discovered MIDI inputs on system: ['Midi Through:Midi Through Port-0 14:0']
+2026-06-07 21:23:04,657 [INFO] (MainThread) Application shutting down
+2026-06-07 21:23:04,657 [INFO] (MainThread) Stopping MidiManager threads

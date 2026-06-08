@@ -1,18 +1,20 @@
 # 🎹 MPK249 Desktop Controller
 
-A beautiful, premium, and lightweight GUI application written in Python using CustomTkinter to control your Linux desktop using the **Akai Professional MPK249** MIDI controller.
+A beautiful, premium, and lightweight GUI application written in Python using CustomTkinter to control your desktop (Linux and macOS) using the **Akai Professional MPK249** MIDI controller.
+
+---
 
 ## 🚀 Key Features
 
-* **Automatic MIDI Discovery**: Auto-detects the MPK249 ALSA MIDI device path (`/dev/snd/midiC*D0`) dynamically from `/proc/asound/cards`.
-* **Zero C-Dependency MIDI Parsing**: Operates via a robust pure-Python byte-level stream parser, avoiding compilation errors and ensuring instant compatibility with Python 3.14+.
+* **Cross-Platform Compatibility**: Fully supports **Linux (X11/Wayland)** and **macOS (Intel/Apple Silicon)**.
+* **Automatic MIDI Discovery**: Auto-detects the MPK249 input ports on your system dynamically.
 * **MIDI Learn Wizard**: No need to look up MIDI CC (Control Change) or note numbers. Just press "MIDI Learn", move any knob/fader or press any pad/key on the MPK249, and it will capture it instantly.
 * **Premium Dark Mode GUI**: A high-fidelity dark-themed interface built using CustomTkinter, featuring real-time visual signal meters, tabs, and customizable menus.
 * **Custom Desktop Triggers**:
-  * **System Volume**: Smoothly set master volume via knobs/faders, or increase/decrease/mute using buttons.
-  * **Keyboard Shortcuts**: Simulate single keys or combinations (e.g., `ctrl+alt+t` to open a terminal, `super+d` to show desktop).
-  * **Shell Commands**: Trigger arbitrary bash scripts or command-line tools.
-  * **Mouse Control**: Emulate mouse clicks or scrolls.
+  * **System Volume**: Smoothly set master volume via knobs/faders, or increase/decrease/mute using buttons (uses `amixer` on Linux and native `AppleScript` on macOS).
+  * **Keyboard Shortcuts**: Simulate single keys or combinations (e.g., `ctrl+alt+t` on Linux, `cmd+space` on macOS).
+  * **Shell Commands**: Trigger arbitrary shell scripts or command-line tools.
+  * **Mouse Control**: Emulate mouse clicks or directional scrolls.
 * **Hot Reconnection**: Daemon listener thread dynamically detects if the controller is unplugged and automatically restores connection once it is plugged back in.
 * **Preset Manager**: Save different sets of mappings (e.g., "Default Desktop Mappings", "Presentation Mode", "Media Control Mode") and swap them instantly.
 
@@ -20,28 +22,44 @@ A beautiful, premium, and lightweight GUI application written in Python using Cu
 
 ## 📁 File Structure
 
-The project contains the following components:
-* [app.py](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/app.py) — The main CustomTkinter GUI wrapper, layout tabs, settings forms, and preset management.
-* [midi_manager.py](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/midi_manager.py) — Handles dynamic MIDI device path detection, a background listener thread, raw bytes parsing, and MIDI Learn mode.
-* [action_handler.py](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/action_handler.py) — Simulates mouse/keyboard commands and system audio changes via `amixer` and `pynput`.
+* [app.py](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/app.py) — The main CustomTkinter GUI layout, tabs, forms, and preset management.
+* [midi_manager.py](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/midi_manager.py) — Handles dynamic MIDI device port detection, background monitoring, and MIDI Learn mode.
+* [action_handler.py](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/action_handler.py) — Simulates mouse/keyboard commands and system audio changes (platform-agnostic).
 * [config.json](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/config.json) — Local configuration file containing active presets and user-customized mappings.
-* [requirements.txt](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/requirements.txt) — Pure-python dependency lists.
-* [run.sh](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/run.sh) — Executive launcher script.
+* [requirements.txt](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/requirements.txt) — Python dependencies with environment markers for cross-platform installations.
+* [run.sh](file:///home/mattysweeps/src/github.com/mattysweeps/frankenstein/run.sh) — Multi-platform launcher script.
 
 ---
 
 ## 🛠️ Installation & Execution
 
-Simply run the launcher script in the repository folder:
+### 🐧 On Linux
 
-```bash
-./run.sh
-```
+1. **Install dependencies**:
+   ```bash
+   sudo apt-get install -y libasound2-dev pkg-config python3-tk
+   ```
+2. **Run the launcher**:
+   ```bash
+   ./run.sh
+   ```
 
-The launcher will automatically:
-1. Initialize a Python virtual environment (`.venv`).
-2. Upgrade `pip` and install all necessary dependencies.
-3. Start the GUI control center.
+### 🍎 On macOS (OSX)
+
+1. **Install Python 3 & Tkinter** (via [Homebrew](https://brew.sh)):
+   ```bash
+   brew install python
+   # Homebrew's Python installs Tkinter by default. If missing, run:
+   brew install python-tk
+   ```
+2. **Grant Accessibility Permissions**:
+   Since the app simulates keyboard hotkeys and mouse actions:
+   * Go to **System Settings > Privacy & Security > Accessibility**.
+   * Add and toggle ON your **Terminal** app (or iTerm2 / VS Code, whichever you use to launch the script).
+3. **Run the launcher**:
+   ```bash
+   ./run.sh
+   ```
 
 ---
 
@@ -53,5 +71,5 @@ The launcher will automatically:
    * Click the **MIDI Learn** button.
    * Move any fader, knob, or press any pad/key on the MPK249. The **Control ID** and proposed **Description** will populate automatically.
 4. Select the desired **Action Type** (e.g., `volume_set`, `keypress`, or `command`).
-5. Fill in the **Parameters** (e.g., `super+d` for keypress, or a shell command to execute).
+5. Fill in the **Parameters** (e.g., `cmd+space` for keypress on macOS, or `ctrl+alt+t` on Linux).
 6. Click **Save Mapping**. Your new control is active immediately!
