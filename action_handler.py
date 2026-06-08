@@ -14,6 +14,11 @@ class ActionHandler:
         # Check system platform
         self.is_mac = (platform.system() == "Darwin")
         
+        # Threading state for volume updates
+        self._target_volume = None
+        self._volume_lock = threading.Lock()
+        self._volume_thread_active = False
+        
         self._key_map = {
             "enter": Key.enter,
             "space": Key.space,
@@ -104,41 +109,69 @@ class ActionHandler:
             print(f"Error executing action {action_type}: {e}", file=sys.stderr)
 
     def adjust_volume(self, step=5):
-        """Adjusts the system volume up or down."""
-        if self.is_mac:
-            # Adjust volume on macOS using AppleScript
-            # Bound output volume settings (0 to 100)
-            cmd = (
-                'osascript -e "set volume output volume '
-                '((output volume of (get volume settings)) + {})"'.format(step)
-            )
-            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        else:
-            # Adjust volume on Linux using ALSA amixer
-            sign = "+" if step > 0 else "-"
-            abs_step = abs(step)
-            subprocess.run(["amixer", "sset", "Master", f"{abs_step}%{sign}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        """Adjusts the system volume up or down asynchronously."""
+        def target():
+            try:
+                if self.is_mac:
+                    # Adjust volume on macOS using AppleScript
+                    # Bound output volume settings (0 to 100)
+                    cmd = (
+                        'osascript -e "set volume output volume '
+                        '((output volume of (get volume settings)) + {})"'.format(step)
+                    )
+                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    # Adjust volume on Linux using ALSA amixer
+                    sign = "+" if step > 0 else "-"
+                    abs_step = abs(step)
+                    subprocess.run(["amixer", "sset", "Master", f"{abs_step}%{sign}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception as e:
+                print(f"Error adjusting volume: {e}", file=sys.stderr)
+        threading.Thread(target=target, daemon=True).start()
 
     def set_volume(self, percent):
-        """Sets system volume to a specific percentage (0-100)."""
+        """Sets system volume to a specific percentage (0-100) asynchronously and thread-safely."""
         percent = max(0, min(100, percent))
-        if self.is_mac:
-            # Set volume on macOS using AppleScript
-            cmd = f'osascript -e "set volume output volume {percent}"'
-            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        else:
-            # Set volume on Linux using ALSA amixer
-            subprocess.run(["amixer", "sset", "Master", f"{percent}%"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        with self._volume_lock:
+            self._target_volume = percent
+            if not self._volume_thread_active:
+                self._volume_thread_active = True
+                threading.Thread(target=self._volume_worker, daemon=True).start()
+
+    def _volume_worker(self):
+        """Worker thread that executes volume updates without blocking the MIDI or GUI threads."""
+        while True:
+            with self._volume_lock:
+                val = self._target_volume
+                self._target_volume = None
+                if val is None:
+                    self._volume_thread_active = False
+                    break
+            
+            try:
+                if self.is_mac:
+                    cmd = f'osascript -e "set volume output volume {val}"'
+                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    subprocess.run(["amixer", "sset", "Master", f"{val}%"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception as e:
+                print(f"Error setting volume: {e}", file=sys.stderr)
 
     def toggle_mute(self):
-        """Toggles system volume mute state."""
-        if self.is_mac:
-            # Toggle mute on macOS using AppleScript
-            cmd = 'osascript -e "set volume output muted not (output muted of (get volume settings))"'
-            subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        else:
-            # Toggle mute on Linux using ALSA amixer
-            subprocess.run(["amixer", "sset", "Master", "toggle"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        """Toggles system volume mute state asynchronously."""
+        def target():
+            try:
+                if self.is_mac:
+                    # Toggle mute on macOS using AppleScript
+                    cmd = 'osascript -e "set volume output muted not (output muted of (get volume settings))"'
+                    subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    # Toggle mute on Linux using ALSA amixer
+                    subprocess.run(["amixer", "sset", "Master", "toggle"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception as e:
+                print(f"Error toggling mute: {e}", file=sys.stderr)
+        threading.Thread(target=target, daemon=True).start()
 
     def run_command(self, cmd_str):
         """Runs a shell command in the background asynchronously."""
