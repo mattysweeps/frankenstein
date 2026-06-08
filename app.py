@@ -33,6 +33,15 @@ sys.excepthook = handle_exception
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
+# Deactivate automatic DPI scaling on Linux to prevent widgets from disappearing/rendering blank on resize/maximize
+if sys.platform.startswith("linux"):
+    try:
+        ctk.deactivate_automatic_dpi_awareness()
+        ctk.set_widget_scaling(1.0)
+        ctk.set_window_scaling(1.0)
+    except Exception as e:
+        logging.warning(f"Failed to deactivate automatic DPI scaling: {e}")
+
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 
 class Mpk249App(ctk.CTk):
@@ -290,7 +299,10 @@ class Mpk249App(ctk.CTk):
         )
         self.canvas.grid(row=1, column=0, padx=10, pady=(2, 10), sticky="nsew")
         self.canvas.bind("<Button-1>", self.on_canvas_click)
-        self.canvas.bind("<Configure>", self.on_canvas_resize)
+        
+        # Bind root window configure event to resize handler instead of the canvas,
+        # ensuring that fullscreen and maximize events are captured directly and reliably.
+        self.bind("<Configure>", self.on_window_configure)
 
         # Mapping tables to track shapes
         self.canvas_items = {}       # control_id -> item data dict
@@ -400,8 +412,11 @@ class Mpk249App(ctk.CTk):
         dy = getattr(self, "canvas_dy", 0.0)
         return scale, dx, dy
 
-    def on_canvas_resize(self, event):
-        """Callback triggered on Canvas resize configure events to redraw schematic elements."""
+    def on_window_configure(self, event):
+        """Callback triggered on root window configure events to debounce and redraw the visual layout."""
+        if event.widget != self:
+            return
+
         # Cancel any pending redraw to debounce the resize events (prevents graphic stutters during dragging)
         if hasattr(self, "_resize_after_id") and self._resize_after_id:
             try:
@@ -419,11 +434,7 @@ class Mpk249App(ctk.CTk):
         else:
             self._resize_extra_ids = []
             
-        # Store latest sizes
-        self._last_resize_w = event.width
-        self._last_resize_h = event.height
-        
-        # Debounce: Schedule redraw to fire after a 100ms pause in resizing
+        # Debounce: Schedule redraw to fire after a 100ms pause in window resizing
         self._resize_after_id = self.after(100, lambda: self.execute_resize_redraw(is_followup=False))
 
     def force_customtkinter_redraw(self, widget):
@@ -441,10 +452,14 @@ class Mpk249App(ctk.CTk):
             self.force_customtkinter_redraw(child)
 
     def execute_resize_redraw(self, is_followup=False):
-        """Executes the actual canvas redrawing using stored width and height dimensions."""
+        """Executes the actual canvas redrawing using current live dimensions."""
         self._resize_after_id = None
-        w = getattr(self, "_last_resize_w", None)
-        h = getattr(self, "_last_resize_h", None)
+        
+        # Force pending geometry changes to apply so winfo size is correct
+        self.update_idletasks()
+        
+        w = self.canvas.winfo_width()
+        h = self.canvas.winfo_height()
 
         self.canvas.delete("all")
         self.canvas_items.clear()
