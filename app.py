@@ -124,46 +124,51 @@ class Mpk249App(ctk.CTk):
         # 1. Top Header Bar
         self.header_frame = ctk.CTkFrame(self, height=60, corner_radius=0)
         self.header_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-        self.header_frame.grid_columnconfigure(0, weight=1)
-
+        
+        # Left side controls: Title & Connection Status Badge
+        self.left_header = ctk.CTkFrame(self.header_frame, fg_color="transparent")
+        self.left_header.pack(side="left", fill="y", padx=20)
+        
         self.title_label = ctk.CTkLabel(
-            self.header_frame, 
+            self.left_header, 
             text="🎹 MPK249 Desktop Controller", 
-            font=ctk.CTkFont(size=22, weight="bold")
+            font=ctk.CTkFont(size=20, weight="bold")
         )
-        self.title_label.grid(row=0, column=0, sticky="w", padx=20, pady=15)
+        self.title_label.pack(side="left", pady=15)
 
-        # Status indicator
         self.status_badge = ctk.CTkLabel(
-            self.header_frame,
+            self.left_header,
             text="🔴 Disconnected",
-            font=ctk.CTkFont(size=12, weight="bold"),
+            font=ctk.CTkFont(size=11, weight="bold"),
             fg_color="#cf4444",
             text_color="white",
             corner_radius=10,
             padx=10,
-            pady=4
+            pady=3
         )
-        self.status_badge.grid(row=0, column=1, padx=(10, 20), pady=15)
+        self.status_badge.pack(side="left", padx=15, pady=15)
 
-        # Preset selection in header
-        self.preset_label = ctk.CTkLabel(self.header_frame, text="Active Preset:")
-        self.preset_label.grid(row=0, column=2, padx=(20, 5), pady=15)
+        # Right side controls: Preset Selection & Action button
+        self.right_header = ctk.CTkFrame(self.header_frame, fg_color="transparent")
+        self.right_header.pack(side="right", fill="y", padx=20)
+
+        self.preset_label = ctk.CTkLabel(self.right_header, text="Active Preset:")
+        self.preset_label.pack(side="left", padx=(0, 5), pady=15)
 
         self.preset_dropdown = ctk.CTkOptionMenu(
-            self.header_frame,
+            self.right_header,
             values=[self.active_preset_name],
             command=self.change_active_preset
         )
-        self.preset_dropdown.grid(row=0, column=3, padx=(0, 10), pady=15)
+        self.preset_dropdown.pack(side="left", padx=5, pady=15)
 
         self.btn_new_preset = ctk.CTkButton(
-            self.header_frame, 
+            self.right_header, 
             text="+ New", 
             width=60, 
             command=self.create_new_preset
         )
-        self.btn_new_preset.grid(row=0, column=4, padx=(0, 20), pady=15)
+        self.btn_new_preset.pack(side="left", padx=(5, 0), pady=15)
 
         # 2. Main Tabview
         self.tabview = ctk.CTkTabview(self)
