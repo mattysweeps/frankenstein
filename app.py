@@ -897,6 +897,25 @@ class Mpk249App(ctk.CTk):
         self.log_to_monitor(f"Preset | Switched to preset: {preset_name}")
         logging.info(f"Switched active preset to '{preset_name}'")
 
+    def create_new_preset(self):
+        logging.info("Opening New Preset dialog")
+        dialog = ctk.CTkInputDialog(text="Enter preset name:", title="New Preset")
+        preset_name = dialog.get_input()
+        if preset_name:
+            preset_name = preset_name.strip()
+            if preset_name:
+                if "presets" not in self.config_data:
+                    self.config_data["presets"] = {}
+                if preset_name not in self.config_data["presets"]:
+                    self.config_data["presets"][preset_name] = {}
+                self.active_preset_name = preset_name
+                self.active_mappings = self.config_data["presets"][preset_name]
+                self.save_config()
+                self.update_preset_selector()
+                self.load_mappings_list()
+                self.log_to_monitor(f"Preset | Created new preset: {preset_name}")
+                logging.info(f"Created and switched to new preset '{preset_name}'")
+
     # ================= MAPPINGS EDITOR FORM =================
     def on_action_type_change(self, choice):
         self.entry_param_val.delete(0, tk.END)
