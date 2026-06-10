@@ -1,5 +1,5 @@
 {
-  "active_preset": "Default Desktop Mappings",
+  "active_preset": "Presentation Mode",
   "presets": {
     "Default Desktop Mappings": {
       "cc:12": {
@@ -63,32 +63,11 @@
       }
     },
     "Presentation Mode": {
-      "cc:117": {
-        "action_type": "keypress",
-        "description": "Play Button: Start Presentation (F5)",
+      "note:36": {
+        "action_type": "script",
+        "description": "Pad 1 (Note 36)",
         "params": {
-          "keys": "f5"
-        }
-      },
-      "cc:120": {
-        "action_type": "keypress",
-        "description": "Fast Forward Button: Next Slide (Right Arrow)",
-        "params": {
-          "keys": "right"
-        }
-      },
-      "cc:119": {
-        "action_type": "keypress",
-        "description": "Rewind Button: Previous Slide (Left Arrow)",
-        "params": {
-          "keys": "left"
-        }
-      },
-      "cc:116": {
-        "action_type": "keypress",
-        "description": "Stop Button: End Slide Show (Esc)",
-        "params": {
-          "keys": "esc"
+          "cmd": "bash /home/mattysweeps/.frankenstein/scripts/Presentation_Mode_note_36.sh"
         }
       }
     }

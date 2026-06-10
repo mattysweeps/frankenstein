@@ -3,16 +3,19 @@ import os
 import sys
 import platform
 import threading
+import shutil
 from pynput.keyboard import Controller as KeyboardController, Key
 from pynput.mouse import Controller as MouseController, Button
 
 class ActionHandler:
-    def __init__(self):
+    def __init__(self, on_script_log_cb=None):
+        self.on_script_log_cb = on_script_log_cb
         self.keyboard = KeyboardController()
         self.mouse = MouseController()
         
         # Check system platform
         self.is_mac = (platform.system() == "Darwin")
+        self.has_wpctl = bool(shutil.which("wpctl"))
         
         # Threading state for volume updates
         self._target_volume = None
@@ -74,6 +77,9 @@ class ActionHandler:
         midi_value: int (0-127) for continuous controls (faders/knobs)
         """
         try:
+            if midi_value == 0 and action_type not in ("volume_set", "mouse_move"):
+                # Ignore button/note/pad release events for discrete actions
+                return
             if action_type == "volume_up":
                 self.adjust_volume(step=params.get("step", 5))
             elif action_type == "volume_down":
@@ -88,7 +94,7 @@ class ActionHandler:
             elif action_type == "keypress":
                 keys_str = params.get("keys", "")
                 self.simulate_keypress(keys_str)
-            elif action_type == "command":
+            elif action_type in ("command", "script"):
                 cmd_str = params.get("cmd", "")
                 self.run_command(cmd_str)
             elif action_type == "mouse_scroll":
@@ -121,10 +127,16 @@ class ActionHandler:
                     )
                     subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 else:
-                    # Adjust volume on Linux using ALSA amixer
-                    sign = "+" if step > 0 else "-"
-                    abs_step = abs(step)
-                    subprocess.run(["amixer", "sset", "Master", f"{abs_step}%{sign}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if self.has_wpctl:
+                        # Adjust volume on Linux using wpctl
+                        float_step = abs(step) / 100.0
+                        sign = "+" if step > 0 else "-"
+                        subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{float_step:.2f}{sign}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    else:
+                        # Adjust volume on Linux using ALSA amixer fallback
+                        sign = "+" if step > 0 else "-"
+                        abs_step = abs(step)
+                        subprocess.run(["amixer", "sset", "Master", f"{abs_step}%{sign}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception as e:
                 print(f"Error adjusting volume: {e}", file=sys.stderr)
         threading.Thread(target=target, daemon=True).start()
@@ -154,7 +166,13 @@ class ActionHandler:
                     cmd = f'osascript -e "set volume output volume {val}"'
                     subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 else:
-                    subprocess.run(["amixer", "sset", "Master", f"{val}%"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if self.has_wpctl:
+                        # Set volume on Linux using wpctl
+                        float_val = val / 100.0
+                        subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", f"{float_val:.2f}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    else:
+                        # Set volume on Linux using ALSA amixer fallback
+                        subprocess.run(["amixer", "sset", "Master", f"{val}%"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception as e:
                 print(f"Error setting volume: {e}", file=sys.stderr)
 
@@ -167,21 +185,86 @@ class ActionHandler:
                     cmd = 'osascript -e "set volume output muted not (output muted of (get volume settings))"'
                     subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 else:
-                    # Toggle mute on Linux using ALSA amixer
-                    subprocess.run(["amixer", "sset", "Master", "toggle"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if self.has_wpctl:
+                        # Toggle mute on Linux using wpctl
+                        subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    else:
+                        # Toggle mute on Linux using ALSA amixer fallback
+                        subprocess.run(["amixer", "sset", "Master", "toggle"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except Exception as e:
                 print(f"Error toggling mute: {e}", file=sys.stderr)
         threading.Thread(target=target, daemon=True).start()
 
+    def get_volume(self):
+        """Queries the current system volume (0-100)."""
+        try:
+            if self.is_mac:
+                # Query macOS volume
+                res = subprocess.run(
+                    ['osascript', '-e', 'output volume of (get volume settings)'],
+                    capture_output=True, text=True, check=True
+                )
+                return int(res.stdout.strip())
+            else:
+                if self.has_wpctl:
+                    # Query Linux volume using wpctl
+                    res = subprocess.run(
+                        ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"],
+                        capture_output=True, text=True, check=True
+                    )
+                    # Output is like: "Volume: 0.75" or "Volume: 0.75 [MUTED]"
+                    line = res.stdout.strip()
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        vol_val = float(parts[1])
+                        return int(vol_val * 100)
+                else:
+                    # Fallback to amixer
+                    res = subprocess.run(
+                        ["amixer", "sget", "Master"],
+                        capture_output=True, text=True, check=True
+                    )
+                    # Parse percentage like "[50%]"
+                    import re
+                    m = re.search(r"\[(\d+)%\]", res.stdout)
+                    if m:
+                        return int(m.group(1))
+        except Exception as e:
+            print(f"Error querying volume: {e}", file=sys.stderr)
+        return 50  # default fallback
+
     def run_command(self, cmd_str):
-        """Runs a shell command in the background asynchronously."""
+        """Runs a shell command in the background asynchronously, capturing stdout and stderr."""
         if not cmd_str:
             return
         def target():
             try:
-                subprocess.run(cmd_str, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if self.on_script_log_cb:
+                    self.on_script_log_cb(f"🚀 Running: {cmd_str}\n")
+                
+                process = subprocess.Popen(
+                    cmd_str,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                
+                for line in iter(process.stdout.readline, ''):
+                    if self.on_script_log_cb:
+                        self.on_script_log_cb(line)
+                
+                process.wait()
+                exit_code = process.returncode
+                if self.on_script_log_cb:
+                    status = "success" if exit_code == 0 else f"failed (exit code {exit_code})"
+                    self.on_script_log_cb(f"🏁 Finished: {cmd_str} -> {status}\n\n")
             except Exception as e:
-                print(f"Failed to run command '{cmd_str}': {e}", file=sys.stderr)
+                err_msg = f"❌ Failed to run command '{cmd_str}': {e}\n\n"
+                print(err_msg, file=sys.stderr)
+                if self.on_script_log_cb:
+                    self.on_script_log_cb(err_msg)
         threading.Thread(target=target, daemon=True).start()
 
     def simulate_keypress(self, keys_str):

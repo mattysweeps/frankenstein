@@ -5,7 +5,9 @@ import logging
 import traceback
 import math
 import tkinter as tk
+from tkinter import messagebox
 import customtkinter as ctk
+import threading
 from midi_manager import MidiManager
 from action_handler import ActionHandler
 
@@ -54,7 +56,7 @@ class Mpk249App(ctk.CTk):
         self.resizable(True, True)
 
         # Initialize Handlers
-        self.action_handler = ActionHandler()
+        self.action_handler = ActionHandler(on_script_log_cb=self.log_to_script_logs)
         self.config_data = self.load_config()
         
         # State variables
@@ -64,6 +66,24 @@ class Mpk249App(ctk.CTk):
         self.is_logging_paused = False
         self.selected_mapping_key = None  # Key currently selected for editing
         self.selected_canvas_control_id = None # Selected control on the visual schematic
+
+        # Hardware preset definitions
+        self.hw_presets = {
+            "Preset 1: DAW": {
+                "knobs": [22, 23, 24, 25, 26, 27, 28, 29],
+                "faders": [12, 13, 14, 15, 16, 17, 18, 19],
+                "switches": [32, 33, 34, 35, 36, 37, 38, 39]
+            },
+            "Preset 30: Generic": {
+                "knobs": [83, 85, 86, 87, 88, 89, 90, 91],
+                "faders": [18, 21, 22, 23, 24, 25, 26, 27],
+                "switches": [20, 70, 71, 72, 73, 74, 75, 76]
+            }
+        }
+        self.hw_preset_name = self.config_data.get("hardware_preset", "Preset 1: DAW")
+        if self.hw_preset_name not in self.hw_presets:
+            self.hw_preset_name = "Preset 1: DAW"
+        self.active_hw_layout = self.hw_presets[self.hw_preset_name]
 
         # Query current system volume to initialize volume control positions accurately
         initial_vol = 50
@@ -76,11 +96,12 @@ class Mpk249App(ctk.CTk):
 
         # Initialize default control values database
         self.control_values = {}
-        for cc in range(12, 20): 
-            # Default Fader 1 (cc:12) to current system volume
-            self.control_values[f"cc:{cc}"] = initial_midi_val if cc == 12 else 0
-        for cc in range(22, 30): self.control_values[f"cc:{cc}"] = 0
-        for cc in range(32, 40): self.control_values[f"cc:{cc}"] = 0
+        first_fader_cc = self.active_hw_layout["faders"][0]
+        for cc in self.active_hw_layout["faders"]: 
+            # Default first fader of active layout to current system volume
+            self.control_values[f"cc:{cc}"] = initial_midi_val if cc == first_fader_cc else 0
+        for cc in self.active_hw_layout["knobs"]: self.control_values[f"cc:{cc}"] = 0
+        for cc in self.active_hw_layout["switches"]: self.control_values[f"cc:{cc}"] = 0
         for cc in [114, 115, 116, 117, 118, 119]: self.control_values[f"cc:{cc}"] = 0
         self.control_values["cc:1"] = initial_midi_val # Modulation wheel starts at current system volume
         self.control_values["pitchwheel"] = 0
@@ -198,6 +219,18 @@ class Mpk249App(ctk.CTk):
         )
         self.btn_new_preset.pack(side="left", padx=(5, 0), pady=15)
 
+        # Hardware Preset Selector
+        self.hw_label = ctk.CTkLabel(self.right_header, text="Hardware:")
+        self.hw_label.pack(side="left", padx=(15, 5), pady=15)
+
+        self.hw_dropdown = ctk.CTkOptionMenu(
+            self.right_header,
+            values=["Preset 1: DAW", "Preset 30: Generic"],
+            command=self.change_hardware_preset
+        )
+        self.hw_dropdown.pack(side="left", padx=5, pady=15)
+        self.hw_dropdown.set(self.hw_preset_name)
+
         # 2. Main Tabview
         self.tabview = ctk.CTkTabview(self)
         self.tabview.grid(row=1, column=0, sticky="nsew", padx=15, pady=10)
@@ -206,10 +239,12 @@ class Mpk249App(ctk.CTk):
         self.tab_dashboard = self.tabview.add("Dashboard")
         self.tab_mappings = self.tabview.add("Mappings Manager")
         self.tab_monitor = self.tabview.add("MIDI Monitor")
+        self.tab_script_logs = self.tabview.add("Script Logs")
 
         self.setup_dashboard_tab()
         self.setup_mappings_tab()
         self.setup_monitor_tab()
+        self.setup_script_logs_tab()
 
     def setup_dashboard_tab(self):
         self.tab_dashboard.grid_columnconfigure((0, 1), weight=1, uniform="equal")
@@ -377,7 +412,7 @@ class Mpk249App(ctk.CTk):
 
         # Action Type Dropdown
         ctk.CTkLabel(self.form_container, text="Action Type:").grid(row=5, column=0, columnspan=2, sticky="w", padx=15, pady=5)
-        self.action_type_options = ["volume_set", "volume_up", "volume_down", "volume_mute", "keypress", "command", "mouse_click", "mouse_scroll"]
+        self.action_type_options = ["volume_set", "volume_up", "volume_down", "volume_mute", "keypress", "script", "command", "mouse_click", "mouse_scroll"]
         self.dropdown_action_type = ctk.CTkOptionMenu(
             self.form_container,
             values=self.action_type_options,
@@ -391,6 +426,13 @@ class Mpk249App(ctk.CTk):
 
         self.entry_param_val = ctk.CTkEntry(self.form_container, placeholder_text="Enter parameter value")
         self.entry_param_val.grid(row=8, column=0, columnspan=2, sticky="ew", padx=15, pady=5)
+        self.btn_edit_vim = ctk.CTkButton(
+            self.form_container,
+            text="Edit in Vim",
+            fg_color="#474747",
+            hover_color="#575757",
+            command=self.open_script_in_vim
+        )
         self.lbl_param_hint = ctk.CTkLabel(
             self.form_container, 
             text="Hint: parameters info", 
@@ -650,7 +692,7 @@ class Mpk249App(ctk.CTk):
 
         # 7. Knobs (K1 - K8)
         for i in range(8):
-            cc_num = 22 + i
+            cc_num = self.active_hw_layout["knobs"][i]
             control_id = f"cc:{cc_num}"
             kx = 535 + i * 46
             ky = 32
@@ -681,7 +723,7 @@ class Mpk249App(ctk.CTk):
 
         # 8. Faders (F1 - F8)
         for i in range(8):
-            cc_num = 12 + i
+            cc_num = self.active_hw_layout["faders"][i]
             control_id = f"cc:{cc_num}"
             fx = 535 + i * 46
             y_start, y_end = 65, 135
@@ -709,7 +751,7 @@ class Mpk249App(ctk.CTk):
 
         # 9. Switches (S1 - S8)
         for i in range(8):
-            cc_num = 32 + i
+            cc_num = self.active_hw_layout["switches"][i]
             control_id = f"cc:{cc_num}"
             sx = 535 + i * 46
             sy = 162
@@ -820,7 +862,7 @@ class Mpk249App(ctk.CTk):
             
             if control_id.startswith("cc:"):
                 cc_val = int(control_id.split(":")[1])
-                if cc_val in range(12, 20): # Faders
+                if cc_val in self.active_hw_layout["faders"]: # Faders
                     self.dropdown_action_type.set("volume_set")
                     self.on_action_type_change("volume_set")
                 else:
@@ -861,7 +903,11 @@ class Mpk249App(ctk.CTk):
             return dx + x * scale, dy + y * scale
 
         # Update LCD screen text
-        self.canvas.itemconfig(self.lcd_text_status, text=f"{item['name'].split(' ')[0]} {control_id}: {value}")
+        if hasattr(self, "lcd_text_status"):
+            try:
+                self.canvas.itemconfig(self.lcd_text_status, text=f"{item['name'].split(' ')[0]} {control_id}: {value}")
+            except Exception:
+                pass
 
         if ctl_type in ["pad", "key", "switch", "transport"]:
             rect_id = item["rect_id"]
@@ -939,12 +985,20 @@ class Mpk249App(ctk.CTk):
     def update_connection_status_ui(self, is_connected, path):
         if is_connected:
             self.status_badge.configure(text="🟢 Connected", fg_color="#2da44e")
-            self.canvas.itemconfig(self.lcd_text_status, text="Device: Connected")
+            if hasattr(self, "lcd_text_status"):
+                try:
+                    self.canvas.itemconfig(self.lcd_text_status, text="Device: Connected")
+                except Exception:
+                    pass
             self.log_to_monitor(f"System | Device Connected: {path}")
             logging.info(f"System status change: Connected to {path}")
         else:
             self.status_badge.configure(text="🔴 Disconnected", fg_color="#cf4444")
-            self.canvas.itemconfig(self.lcd_text_status, text="Device: Disconnected")
+            if hasattr(self, "lcd_text_status"):
+                try:
+                    self.canvas.itemconfig(self.lcd_text_status, text="Device: Disconnected")
+                except Exception:
+                    pass
             self.log_to_monitor("System | Device Disconnected. Waiting for MPK249...")
             logging.warning("System status change: Disconnected")
 
@@ -972,6 +1026,38 @@ class Mpk249App(ctk.CTk):
         self.log_to_monitor(f"Preset | Switched to preset: {preset_name}")
         logging.info(f"Switched active preset to '{preset_name}'")
 
+    def change_hardware_preset(self, hw_preset_name):
+        self.hw_preset_name = hw_preset_name
+        self.active_hw_layout = self.hw_presets[self.hw_preset_name]
+        
+        # Save to config
+        self.config_data["hardware_preset"] = self.hw_preset_name
+        self.save_config()
+        
+        # Re-initialize control_values for any new CCs
+        initial_vol = 50
+        try:
+            initial_vol = self.action_handler.get_volume()
+        except Exception as e:
+            logging.warning(f"Could not query system volume on HW preset switch: {e}")
+        initial_midi_val = int((initial_vol / 100.0) * 127)
+
+        for cc in self.active_hw_layout["faders"]:
+            if f"cc:{cc}" not in self.control_values:
+                self.control_values[f"cc:{cc}"] = initial_midi_val if cc == self.active_hw_layout["faders"][0] else 0
+        for cc in self.active_hw_layout["knobs"]:
+            if f"cc:{cc}" not in self.control_values:
+                self.control_values[f"cc:{cc}"] = 0
+        for cc in self.active_hw_layout["switches"]:
+            if f"cc:{cc}" not in self.control_values:
+                self.control_values[f"cc:{cc}"] = 0
+                
+        # Redraw the schematic with the new layout
+        self.execute_resize_redraw()
+        
+        self.log_to_monitor(f"Hardware | Switched to hardware preset: {hw_preset_name}")
+        logging.info(f"Switched hardware preset to '{hw_preset_name}'")
+
     def create_new_preset(self):
         logging.info("Opening New Preset dialog")
         dialog = ctk.CTkInputDialog(text="Enter preset name:", title="New Preset")
@@ -996,6 +1082,10 @@ class Mpk249App(ctk.CTk):
         self.entry_param_val.delete(0, tk.END)
         logging.debug(f"Action type dropdown selection changed to {choice}")
         
+        if hasattr(self, "btn_edit_vim"):
+            self.btn_edit_vim.grid_forget()
+        self.entry_param_val.grid(row=8, column=0, columnspan=2, sticky="ew", padx=15, pady=5)
+        
         if choice in ["volume_up", "volume_down"]:
             self.param_label.configure(text="Step size (%):")
             self.entry_param_val.insert(0, "5")
@@ -1017,6 +1107,16 @@ class Mpk249App(ctk.CTk):
             self.entry_param_val.insert(0, "ctrl+alt+t")
             self.lbl_param_hint.configure(text="Hint: Connect keys with + (e.g. ctrl+alt+t, super+d, space).")
             self.entry_param_val.configure(state="normal")
+            
+        elif choice == "script":
+            self.param_label.configure(text="Script / Command:")
+            self.entry_param_val.insert(0, "./script.sh")
+            self.lbl_param_hint.configure(text="Hint: Enter a shell command or path to a script file (e.g. ./myscript.sh).")
+            self.entry_param_val.configure(state="normal")
+            
+            # Reposition to make room for Vim button
+            self.entry_param_val.grid(row=8, column=0, columnspan=1, sticky="ew", padx=(15, 5), pady=5)
+            self.btn_edit_vim.grid(row=8, column=1, columnspan=1, sticky="ew", padx=(5, 15), pady=5)
             
         elif choice == "command":
             self.param_label.configure(text="Shell Command:")
@@ -1076,7 +1176,7 @@ class Mpk249App(ctk.CTk):
         logging.info(f"Form submission: save mapping key={control_id}, action={action_type}")
 
         if not control_id:
-            tk.messagebox.showerror("Validation Error", "Control ID is required. Try using MIDI Learn or clicking the schematic.")
+            messagebox.showerror("Validation Error", "Control ID is required. Try using MIDI Learn or clicking the schematic.")
             return
 
         params = {}
@@ -1089,6 +1189,17 @@ class Mpk249App(ctk.CTk):
             params["keys"] = param_text
         elif action_type == "command":
             params["cmd"] = param_text
+        elif action_type == "script":
+            preset_name = self.active_preset_name
+            script_path = self.get_script_path(preset_name, control_id)
+            if param_text not in (script_path, f"bash {script_path}"):
+                try:
+                    with open(script_path, "w") as f:
+                        f.write(param_text)
+                    os.chmod(script_path, 0o755)
+                except Exception as e:
+                    logging.error(f"Failed to write script file {script_path}: {e}")
+            params["cmd"] = f"bash {script_path}"
         elif action_type == "mouse_click":
             params["button"] = param_text if param_text else "left"
         elif action_type == "mouse_scroll":
@@ -1136,7 +1247,7 @@ class Mpk249App(ctk.CTk):
             self.entry_param_val.insert(0, str(params.get("step", 5)))
         elif action_type == "keypress":
             self.entry_param_val.insert(0, params.get("keys", ""))
-        elif action_type == "command":
+        elif action_type in ["command", "script"]:
             self.entry_param_val.insert(0, params.get("cmd", ""))
         elif action_type == "mouse_click":
             self.entry_param_val.insert(0, params.get("button", "left"))
@@ -1202,6 +1313,8 @@ class Mpk249App(ctk.CTk):
                 param_detail = f" (Keys: {params.get('keys', '')})"
             elif action_type == "command":
                 param_detail = f" (Cmd: {params.get('cmd', '')})"
+            elif action_type == "script":
+                param_detail = f" (Script: {params.get('cmd', '')})"
             elif action_type == "mouse_click":
                 param_detail = f" (Button: {params.get('button', '')})"
             elif action_type == "mouse_scroll":
@@ -1279,6 +1392,143 @@ class Mpk249App(ctk.CTk):
             self.txt_monitor.delete("1.0", "150.0")
             
         self.txt_monitor.configure(state="disabled")
+
+    def setup_script_logs_tab(self):
+        self.tab_script_logs.grid_columnconfigure(0, weight=1)
+        self.tab_script_logs.grid_rowconfigure(1, weight=1)
+
+        ctrl_frame = ctk.CTkFrame(self.tab_script_logs)
+        ctrl_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        
+        self.btn_clear_script_log = ctk.CTkButton(ctrl_frame, text="Clear Log", command=self.clear_script_log, width=100)
+        self.btn_clear_script_log.pack(side="left", padx=10, pady=5)
+
+        self.txt_script_logs = ctk.CTkTextbox(self.tab_script_logs, wrap="none", font=ctk.CTkFont(family="monospace", size=12))
+        self.txt_script_logs.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.txt_script_logs.configure(state="disabled")
+
+    def clear_script_log(self):
+        self.txt_script_logs.configure(state="normal")
+        self.txt_script_logs.delete("1.0", tk.END)
+        self.txt_script_logs.configure(state="disabled")
+
+    def log_to_script_logs(self, text):
+        self.after(0, self._append_script_log, text)
+
+    def _append_script_log(self, text):
+        self.txt_script_logs.configure(state="normal")
+        self.txt_script_logs.insert(tk.END, text)
+        self.txt_script_logs.see(tk.END)
+        
+        lines = self.txt_script_logs.get("1.0", tk.END).splitlines()
+        if len(lines) > 1000:
+            self.txt_script_logs.delete("1.0", "200.0")
+            
+        self.txt_script_logs.configure(state="disabled")
+
+    def get_script_path(self, preset_name, control_id):
+        # Sanitize preset_name and control_id
+        safe_preset = "".join([c if c.isalnum() else "_" for c in preset_name])
+        safe_control = "".join([c if c.isalnum() else "_" for c in control_id])
+        filename = f"{safe_preset}_{safe_control}.sh"
+        
+        scripts_dir = os.path.expanduser("~/.frankenstein/scripts")
+        os.makedirs(scripts_dir, exist_ok=True)
+        return os.path.join(scripts_dir, filename)
+
+    def open_script_in_vim(self):
+        # Disable button to prevent double-clicks
+        self.btn_edit_vim.configure(state="disabled", text="Vim Active...")
+        
+        # Get current text inside parameter entry box
+        current_script = self.entry_param_val.get().strip()
+        control_id = self.entry_control_id.get().strip()
+        
+        if not control_id:
+            messagebox.showerror("Validation Error", "Please specify a Control ID (via MIDI Learn or selection) before editing the script.")
+            self.btn_edit_vim.configure(state="normal", text="Edit in Vim")
+            return
+        
+        # We'll run terminal + vim in a background thread to keep GUI responsive!
+        def thread_target():
+            import tempfile
+            import shutil
+            import subprocess
+            import platform
+            import time
+            
+            try:
+                script_path = self.get_script_path(self.active_preset_name, control_id)
+                
+                # If script file does not exist, or if the user typed some custom script text
+                # in the entry box (not the path itself), write it to the file first so Vim has it.
+                if not os.path.exists(script_path) or current_script not in (script_path, f"bash {script_path}"):
+                    with open(script_path, "w") as f:
+                        f.write(current_script if current_script else "#!/bin/bash\n\n")
+                    os.chmod(script_path, 0o755)
+                
+                # Determine command
+                term_cmd = []
+                sentinel_file = None
+                
+                if platform.system() == "Darwin":
+                    # macOS
+                    sentinel_file = script_path + ".done"
+                    if os.path.exists(sentinel_file):
+                        os.remove(sentinel_file)
+                    
+                    escaped_path = script_path.replace('"', '\\"')
+                    escaped_sentinel = sentinel_file.replace('"', '\\"')
+                    apple_script = f'tell application "Terminal" to do script "vim \\"{escaped_path}\\"; touch \\"{escaped_sentinel}\\"; exit"'
+                    subprocess.run(["osascript", "-e", apple_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    
+                    # Poll for sentinel
+                    while not os.path.exists(sentinel_file):
+                        time.sleep(0.25)
+                        
+                    try:
+                        os.remove(sentinel_file)
+                    except Exception:
+                        pass
+                else:
+                    # Linux: Check common term emulators
+                    if shutil.which("alacritty"):
+                        term_cmd = ["alacritty", "-e", "vim", script_path]
+                    elif shutil.which("gnome-terminal"):
+                        term_cmd = ["gnome-terminal", "--wait", "--", "vim", script_path]
+                    elif shutil.which("kitty"):
+                        term_cmd = ["kitty", "-e", "vim", script_path]
+                    elif shutil.which("konsole"):
+                        term_cmd = ["konsole", "-e", "vim", script_path]
+                    elif shutil.which("xfce4-terminal"):
+                        term_cmd = ["xfce4-terminal", "-e", "vim", script_path]
+                    elif shutil.which("xterm"):
+                        term_cmd = ["xterm", "-e", "vim", script_path]
+                    else:
+                        term_cmd = ["vim", script_path]
+                        
+                    if term_cmd:
+                        subprocess.run(term_cmd)
+                
+                # Update GUI safely passing the script_path
+                self.after(0, self._on_vim_edit_complete, script_path)
+                
+            except Exception as e:
+                logging.error(f"Error editing script in Vim: {e}", exc_info=True)
+                self.after(0, self._on_vim_edit_complete, None, error=str(e))
+                
+        threading.Thread(target=thread_target, daemon=True).start()
+
+    def _on_vim_edit_complete(self, script_path, error=None):
+        self.btn_edit_vim.configure(state="normal", text="Edit in Vim")
+        if error:
+            messagebox.showerror("Vim Edit Error", f"Failed to edit script: {error}")
+            return
+            
+        if script_path is not None:
+            self.entry_param_val.delete(0, tk.END)
+            self.entry_param_val.insert(0, f"bash {script_path}")
+            self.log_to_monitor("System | Updated script command from Vim editor")
 
     def check_signals(self):
         """Allows Python interpreter to process Ctrl-C signals while running Tkinter mainloop."""

@@ -13,7 +13,7 @@ A beautiful, premium, and lightweight GUI application written in Python using Cu
 * **Custom Desktop Triggers**:
   * **System Volume**: Smoothly set master volume via knobs/faders, or increase/decrease/mute using buttons (uses `amixer` on Linux and native `AppleScript` on macOS).
   * **Keyboard Shortcuts**: Simulate single keys or combinations (e.g., `ctrl+alt+t` on Linux, `cmd+space` on macOS).
-  * **Shell Commands**: Trigger arbitrary shell scripts or command-line tools.
+  * **Shell Commands / Scripts**: Trigger arbitrary shell scripts or command-line tools using `command` or `script` actions.
   * **Mouse Control**: Emulate mouse clicks or directional scrolls.
 * **Hot Reconnection**: Daemon listener thread dynamically detects if the controller is unplugged and automatically restores connection once it is plugged back in.
 * **Preset Manager**: Save different sets of mappings (e.g., "Default Desktop Mappings", "Presentation Mode", "Media Control Mode") and swap them instantly.
@@ -80,6 +80,6 @@ A beautiful, premium, and lightweight GUI application written in Python using Cu
 3. Under the **Add / Edit Mapping** form:
    * Click the **MIDI Learn** button.
    * Move any fader, knob, or press any pad/key on the MPK249. The **Control ID** and proposed **Description** will populate automatically.
-4. Select the desired **Action Type** (e.g., `volume_set`, `keypress`, or `command`).
+4. Select the desired **Action Type** (e.g., `volume_set`, `keypress`, `script`, or `command`).
 5. Fill in the **Parameters** (e.g., `cmd+space` for keypress on macOS, or `ctrl+alt+t` on Linux).
 6. Click **Save Mapping**. Your new control is active immediately!
