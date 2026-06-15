@@ -8,8 +8,9 @@ from pynput.keyboard import Controller as KeyboardController, Key
 from pynput.mouse import Controller as MouseController, Button
 
 class ActionHandler:
-    def __init__(self, on_script_log_cb=None):
+    def __init__(self, on_script_log_cb=None, on_midi_out_cb=None):
         self.on_script_log_cb = on_script_log_cb
+        self.on_midi_out_cb = on_midi_out_cb
         self.keyboard = KeyboardController()
         self.mouse = MouseController()
         
@@ -103,6 +104,54 @@ class ActionHandler:
             elif action_type == "mouse_click":
                 btn = params.get("button", "left").lower()
                 self.simulate_click(btn)
+            elif action_type == "midi_out":
+                if self.on_midi_out_cb:
+                    import mido
+                    msg_type = params.get("msg_type", "control_change")
+                    if msg_type == "sysex":
+                        hex_str = params.get("hex_data", "")
+                        # Remove whitespace and F0/F7 if present
+                        hex_str = hex_str.replace(" ", "").lower()
+                        if hex_str.startswith("f0"):
+                            hex_str = hex_str[2:]
+                        if hex_str.endswith("f7"):
+                            hex_str = hex_str[:-2]
+                        try:
+                            data_bytes = list(bytes.fromhex(hex_str))
+                            msg = mido.Message('sysex', data=data_bytes)
+                            self.on_midi_out_cb(msg)
+                        except Exception as e:
+                            print(f"Error parsing SysEx hex: {e}", file=sys.stderr)
+                    else:
+                        try:
+                            cc_note = int(params.get("cc_note", 0))
+                        except (ValueError, TypeError):
+                            cc_note = 0
+                        # Use input midi_value or a fixed value
+                        val = params.get("value", "dynamic")
+                        if val == "dynamic":
+                            out_val = midi_value if midi_value is not None else 127
+                        else:
+                            try:
+                                out_val = int(val)
+                            except (ValueError, TypeError):
+                                out_val = 127
+                        
+                        try:
+                            channel = int(params.get("channel", 0))
+                        except (ValueError, TypeError):
+                            channel = 0
+                        
+                        if msg_type == "control_change":
+                            msg = mido.Message('control_change', control=cc_note, value=out_val, channel=channel)
+                        elif msg_type == "note_on":
+                            msg = mido.Message('note_on', note=cc_note, velocity=out_val, channel=channel)
+                        elif msg_type == "note_off":
+                            msg = mido.Message('note_off', note=cc_note, velocity=0, channel=channel)
+                        else:
+                            msg = mido.Message(msg_type, channel=channel)
+                        
+                        self.on_midi_out_cb(msg)
             elif action_type == "mouse_move":
                 dx = params.get("dx", 0)
                 dy = params.get("dy", 0)

@@ -1,6 +1,9 @@
 import os
 import json
 import sys
+import subprocess
+import re
+import time
 import logging
 import traceback
 import math
@@ -47,6 +50,9 @@ if sys.platform.startswith("linux"):
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
 
 class Mpk249App(ctk.CTk):
+    installed_apps = {}
+    active_app_name = None
+
     def __init__(self):
         super().__init__()
         logging.info("Initializing MPK249 Control Center App")
@@ -58,6 +64,7 @@ class Mpk249App(ctk.CTk):
         # Initialize Handlers
         self.action_handler = ActionHandler(on_script_log_cb=self.log_to_script_logs)
         self.config_data = self.load_config()
+        self.installed_apps = self._get_installed_apps()
         
         # State variables
         self.active_preset_name = self.config_data.get("active_preset", "Default Desktop Mappings")
@@ -123,7 +130,11 @@ class Mpk249App(ctk.CTk):
 
         # Update initial UI states
         self.update_preset_selector()
+        self.selected_app_scope = "Default"
+        self.active_app_name = None
+        self.update_app_scopes()
         self.load_mappings_list()
+        self.start_active_app_monitor()
 
         # Start signal checking loop to allow Ctrl-C termination in terminal
         self.check_signals()
@@ -163,6 +174,75 @@ class Mpk249App(ctk.CTk):
         except Exception as e:
             logging.error(f"Failed to save config: {e}", exc_info=True)
             self.log_to_monitor(f"System Error: Failed to save config: {e}")
+
+    def _get_installed_apps(self):
+        apps = {}
+        dirs = [
+            "/usr/share/applications",
+            os.path.expanduser("~/.local/share/applications"),
+            "/var/lib/snapd/desktop/applications",
+            "/var/lib/flatpak/exports/share/applications",
+            os.path.expanduser("~/.local/share/flatpak/exports/share/applications")
+        ]
+        
+        for d in dirs:
+            if not os.path.exists(d):
+                continue
+            try:
+                for f in os.listdir(d):
+                    if not f.endswith(".desktop"):
+                        continue
+                    path = os.path.join(d, f)
+                    try:
+                        name = None
+                        wm_class = None
+                        exec_name = None
+                        with open(path, "r", encoding="utf-8", errors="ignore") as file:
+                            for line in file:
+                                if line.startswith("Name="):
+                                    if name is None:
+                                        name = line.split("=", 1)[1].strip()
+                                elif line.startswith("StartupWMClass="):
+                                    wm_class = line.split("=", 1)[1].strip()
+                                elif line.startswith("Exec="):
+                                    if exec_name is None:
+                                        exec_val = line.split("=", 1)[1].strip()
+                                        first_word = exec_val.split()[0] if exec_val else ""
+                                        exec_name = os.path.basename(first_word).replace('"', '').replace("'", "")
+                                        if "%" in exec_name:
+                                            exec_name = exec_name.split("%")[0].strip()
+                        if name:
+                            patterns = {name.lower()}
+                            patterns.add(f[:-8].lower())
+                            if wm_class:
+                                patterns.add(wm_class.lower())
+                            if exec_name:
+                                patterns.add(exec_name.lower())
+                            
+                            if name not in apps:
+                                apps[name] = set()
+                            apps[name].update(patterns)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+        return {k: list(v) for k, v in apps.items()}
+
+    def get_display_name(self, active_app):
+        if not active_app:
+            return "Desktop"
+        if self.installed_apps:
+            # First pass: exact case-insensitive match
+            for name, patterns in self.installed_apps.items():
+                for pat in patterns:
+                    if active_app.lower() == pat.lower():
+                        return name
+            # Second pass: substring match
+            for name, patterns in self.installed_apps.items():
+                for pat in patterns:
+                    if pat.lower() in active_app.lower() or active_app.lower() in pat.lower():
+                        return name
+        return active_app
 
     # ================= UI SETUP =================
     def setup_ui(self):
@@ -370,11 +450,49 @@ class Mpk249App(ctk.CTk):
         self.list_container.grid_columnconfigure(0, weight=1)
         self.list_container.grid_rowconfigure(1, weight=1)
 
+        header_subframe = ctk.CTkFrame(self.list_container, fg_color="transparent")
+        header_subframe.grid(row=0, column=0, sticky="ew", padx=15, pady=10)
+        
         ctk.CTkLabel(
-            self.list_container, 
+            header_subframe, 
             text="Active Mappings", 
             font=ctk.CTkFont(size=16, weight="bold")
-        ).grid(row=0, column=0, sticky="w", padx=15, pady=10)
+        ).pack(side="left")
+        
+        ctk.CTkLabel(
+            header_subframe, 
+            text="App Scope:", 
+            font=ctk.CTkFont(size=12)
+        ).pack(side="left", padx=(20, 5))
+        
+        self.selected_app_scope = "Default"
+        self.app_scope_dropdown = ctk.CTkComboBox(
+            header_subframe,
+            values=["Default"],
+            command=self.change_app_scope,
+            width=200
+        )
+        self.app_scope_dropdown.pack(side="left", padx=5)
+        
+        self.btn_add_scope = ctk.CTkButton(
+            header_subframe,
+            text="+ Add App",
+            width=70,
+            fg_color="#3B8ED0",
+            hover_color="#1F6AA5",
+            command=self.add_custom_app_scope
+        )
+        self.btn_add_scope.pack(side="left", padx=5)
+
+        self.btn_delete_scope = ctk.CTkButton(
+            header_subframe,
+            text="Delete App",
+            width=70,
+            fg_color="#cf4444",
+            hover_color="#b03a3a",
+            command=self.delete_current_app_scope
+        )
+        self.btn_delete_scope.pack(side="left", padx=5)
 
         self.scroll_mappings = ctk.CTkScrollableFrame(self.list_container)
         self.scroll_mappings.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
@@ -851,7 +969,8 @@ class Mpk249App(ctk.CTk):
         self.entry_control_id.delete(0, tk.END)
         self.entry_control_id.insert(0, control_id)
         
-        if control_id in self.active_mappings:
+        target_mappings = self.get_current_mappings()
+        if control_id in target_mappings:
             self.edit_mapping(control_id)
         else:
             self.clear_mapping_form()
@@ -961,8 +1080,40 @@ class Mpk249App(ctk.CTk):
             self.after(0, self.update_dashboard_signal, control_id, value)
             self.after(0, self.update_canvas_control, control_id, value)
             
-            if control_id in self.active_mappings:
-                mapping = self.active_mappings[control_id]
+            # Determine active application name
+            active_app = self.active_app_name
+            
+            # Look for overrides
+            mapping = None
+            if active_app:
+                overrides = self.active_mappings.get("app_overrides", {})
+                for app_pattern, app_mappings in overrides.items():
+                    # Match active_app to app_pattern
+                    matched = False
+                    if app_pattern.lower() == active_app.lower():
+                        matched = True
+                    else:
+                        disp_active = self.get_display_name(active_app)
+                        if app_pattern.lower() == disp_active.lower():
+                            matched = True
+                        elif app_pattern.lower() in active_app.lower() or active_app.lower() in app_pattern.lower():
+                            matched = True
+                        elif self.installed_apps and app_pattern in self.installed_apps:
+                            for pat in self.installed_apps[app_pattern]:
+                                if pat.lower() in active_app.lower() or active_app.lower() in pat.lower():
+                                    matched = True
+                                    break
+                    if matched:
+                        if control_id in app_mappings:
+                            mapping = app_mappings[control_id]
+                            logging.info(f"Using app-specific override for {active_app} (matched {app_pattern}): {control_id}")
+                            break
+            
+            if not mapping and control_id in self.active_mappings:
+                if control_id != "app_overrides":
+                    mapping = self.active_mappings[control_id]
+                    
+            if mapping:
                 action_type = mapping.get("action_type")
                 params = mapping.get("params", {})
                 desc = mapping.get("description", "Unknown Action")
@@ -1021,6 +1172,8 @@ class Mpk249App(ctk.CTk):
     def change_active_preset(self, preset_name):
         self.active_preset_name = preset_name
         self.active_mappings = self.config_data.get("presets", {}).get(preset_name, {})
+        self.selected_app_scope = "Default"
+        self.update_app_scopes()
         self.save_config()
         self.load_mappings_list()
         self.log_to_monitor(f"Preset | Switched to preset: {preset_name}")
@@ -1211,7 +1364,8 @@ class Mpk249App(ctk.CTk):
         if not description:
             description = f"{action_type.capitalize()} on {control_id}"
 
-        self.active_mappings[control_id] = {
+        target_mappings = self.get_current_mappings()
+        target_mappings[control_id] = {
             "action_type": action_type,
             "description": description,
             "params": params
@@ -1223,12 +1377,13 @@ class Mpk249App(ctk.CTk):
         self.log_to_monitor(f"Mappings | Saved mapping for {control_id}")
 
     def edit_mapping(self, key):
-        if key not in self.active_mappings:
+        target_mappings = self.get_current_mappings()
+        if key not in target_mappings:
             return
         
         logging.info(f"Loading mapping '{key}' for editing")
         self.selected_mapping_key = key
-        mapping = self.active_mappings[key]
+        mapping = target_mappings[key]
         
         self.entry_control_id.delete(0, tk.END)
         self.entry_control_id.insert(0, key)
@@ -1255,9 +1410,10 @@ class Mpk249App(ctk.CTk):
             self.entry_param_val.insert(0, str(params.get("amount", 1)))
 
     def delete_mapping(self, key):
-        if key in self.active_mappings:
+        target_mappings = self.get_current_mappings()
+        if key in target_mappings:
             logging.info(f"Deleting mapping for '{key}'")
-            del self.active_mappings[key]
+            del target_mappings[key]
             self.save_config()
             self.load_mappings_list()
             if self.selected_mapping_key == key:
@@ -1278,10 +1434,11 @@ class Mpk249App(ctk.CTk):
         for widget in self.scroll_mappings.winfo_children():
             widget.destroy()
 
-        if not self.active_mappings:
+        target_mappings = self.get_current_mappings()
+        if not target_mappings:
             lbl_empty = ctk.CTkLabel(
                 self.scroll_mappings, 
-                text="No mappings configured yet for this preset.\nUse the form on the right to add some!", 
+                text="No mappings configured yet for this scope.\nUse the form on the right to add some!", 
                 text_color="gray",
                 font=ctk.CTkFont(size=12, slant="italic")
             )
@@ -1289,7 +1446,7 @@ class Mpk249App(ctk.CTk):
             return
 
         row = 0
-        for key, mapping in sorted(self.active_mappings.items()):
+        for key, mapping in sorted(target_mappings.items()):
             card = ctk.CTkFrame(self.scroll_mappings, corner_radius=6, fg_color=("#e5e5e5", "#242424"))
             card.grid(row=row, column=0, sticky="ew", padx=5, pady=4)
             card.grid_columnconfigure(0, weight=1)
@@ -1427,10 +1584,14 @@ class Mpk249App(ctk.CTk):
         self.txt_script_logs.configure(state="disabled")
 
     def get_script_path(self, preset_name, control_id):
-        # Sanitize preset_name and control_id
+        # Sanitize preset_name, selected_app_scope, and control_id
         safe_preset = "".join([c if c.isalnum() else "_" for c in preset_name])
         safe_control = "".join([c if c.isalnum() else "_" for c in control_id])
-        filename = f"{safe_preset}_{safe_control}.sh"
+        scope_suffix = ""
+        if hasattr(self, 'selected_app_scope') and self.selected_app_scope != "Default":
+            safe_scope = "".join([c if c.isalnum() else "_" for c in self.selected_app_scope])
+            scope_suffix = f"_{safe_scope}"
+        filename = f"{safe_preset}{scope_suffix}_{safe_control}.sh"
         
         scripts_dir = os.path.expanduser("~/.frankenstein/scripts")
         os.makedirs(scripts_dir, exist_ok=True)
@@ -1529,6 +1690,253 @@ class Mpk249App(ctk.CTk):
             self.entry_param_val.delete(0, tk.END)
             self.entry_param_val.insert(0, f"bash {script_path}")
             self.log_to_monitor("System | Updated script command from Vim editor")
+
+    def _run_gdbus(self, args):
+        try:
+            cmd = ['gdbus']
+            if len(args) > 0 and args[0] == 'call':
+                cmd.extend(['call', '--timeout', '1'])
+                cmd.extend(args[1:])
+            else:
+                cmd.extend(args)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=1.0)
+            return result.stdout.strip()
+        except Exception:
+            return None
+
+    def _get_a11y_bus_address(self):
+        out = self._run_gdbus(['call', '--session', '--dest', 'org.a11y.Bus', '--object-path', '/org/a11y/bus', '--method', 'org.a11y.Bus.GetAddress'])
+        if not out:
+            return None
+        m = re.search(r"'(unix:path=[^']+)'", out)
+        if m:
+            return m.group(1)
+        return None
+
+    def _parse_dbus_array_tuples(self, s):
+        return re.findall(r"\('([^']+)',\s*(?:objectpath\s*)?'([^']+)'\)", s)
+
+    def _parse_dbus_state(self, s):
+        matches = re.findall(r"uint32\s+(\d+)", s)
+        if not matches:
+            inner = re.search(r"\[([^\]]+)\]", s)
+            if inner:
+                matches = [x.strip() for x in inner.group(1).split(',')]
+        return [int(x) for x in matches if x.strip().isdigit()]
+
+    def _get_dbus_property(self, bus_addr, dest, path, interface, prop):
+        out = self._run_gdbus([
+            'call', '--address', bus_addr, '--dest', dest, '--object-path', path,
+            '--method', 'org.freedesktop.DBus.Properties.Get', interface, prop
+        ])
+        if not out:
+            return None
+        m = re.search(r"<\s*'(.*)'\s*>", out)
+        if m:
+            return m.group(1)
+        m = re.search(r"<\s*([^>]+)\s*>", out)
+        if m:
+            return m.group(1).strip()
+        return out
+
+    def _query_atspi_active_app(self, bus_addr):
+        registry_out = self._run_gdbus([
+            'call', '--address', bus_addr, '--dest', 'org.a11y.atspi.Registry',
+            '--object-path', '/org/a11y/atspi/accessible/root',
+            '--method', 'org.a11y.atspi.Accessible.GetChildren'
+        ])
+        if not registry_out:
+            return None
+            
+        apps = self._parse_dbus_array_tuples(registry_out)
+        focused_candidate = None
+        
+        for app_bus, app_path in apps:
+            app_children_out = self._run_gdbus([
+                'call', '--address', bus_addr, '--dest', app_bus,
+                '--object-path', '/org/a11y/atspi/accessible/root',
+                '--method', 'org.a11y.atspi.Accessible.GetChildren'
+            ])
+            if not app_children_out:
+                continue
+                
+            windows = self._parse_dbus_array_tuples(app_children_out)
+            for win_bus, win_path in windows:
+                state_out = self._run_gdbus([
+                    'call', '--address', bus_addr, '--dest', win_bus,
+                    '--object-path', win_path,
+                    '--method', 'org.a11y.atspi.Accessible.GetState'
+                ])
+                if not state_out:
+                    continue
+                    
+                states = self._parse_dbus_state(state_out)
+                if not states:
+                    continue
+                    
+                is_active = (states[0] & (1 << 1)) != 0
+                is_focused = (states[0] & (1 << 12)) != 0
+                
+                if is_active or is_focused:
+                    app_name = self._get_dbus_property(bus_addr, app_bus, '/org/a11y/atspi/accessible/root', 'org.a11y.atspi.Accessible', 'Name')
+                    if not app_name:
+                        continue
+                        
+                    if app_name.lower() in ['gnome-shell', 'mutter-x11-frames', 'ibus', 'gjs']:
+                        continue
+                        
+                    if is_active:
+                        return app_name
+                    elif is_focused and not focused_candidate:
+                        focused_candidate = app_name
+                        
+        if focused_candidate:
+            return focused_candidate
+        return None
+
+    def _query_xprop_active_app(self):
+        try:
+            out = subprocess.run(['xprop', '-root', '_NET_ACTIVE_WINDOW'], capture_output=True, text=True, check=True)
+            m = re.search(r"window id # (0x[0-9a-fA-F]+)", out.stdout)
+            if m:
+                win_id = m.group(1)
+                if win_id and int(win_id, 16) != 0:
+                    out_class = subprocess.run(['xprop', '-id', win_id, 'WM_CLASS'], capture_output=True, text=True, check=True)
+                    m_class = re.findall(r'"([^"]+)"', out_class.stdout)
+                    if m_class:
+                        val = m_class[-1]
+                        if val.lower() not in ['gnome-shell', 'mutter-x11-frames', 'ibus', 'gjs']:
+                            return val
+        except Exception:
+            pass
+        return None
+
+    def _query_active_app(self, a11y_bus_addr):
+        app_name = self._query_atspi_active_app(a11y_bus_addr)
+        if app_name:
+            return app_name
+            
+        app_name = self._query_xprop_active_app()
+        if app_name:
+            return app_name
+            
+        return None
+
+    def start_active_app_monitor(self):
+        self.active_app_name = None
+        threading.Thread(target=self._active_app_monitor_loop, daemon=True).start()
+
+    def _active_app_monitor_loop(self):
+        a11y_bus_addr = None
+        while True:
+            try:
+                if not a11y_bus_addr:
+                    a11y_bus_addr = self._get_a11y_bus_address()
+                
+                app_name = self._query_active_app(a11y_bus_addr)
+                if app_name != self.active_app_name:
+                    self.active_app_name = app_name
+                    self.after(0, self._on_active_app_changed, app_name)
+            except Exception as e:
+                logging.debug(f"Error in active app monitor loop: {e}")
+                a11y_bus_addr = None
+            time.sleep(1.0)
+
+    def _on_active_app_changed(self, app_name):
+        display_name = self.get_display_name(app_name) if app_name else "Desktop"
+        logging.info(f"Active application changed to: {display_name} (raw: {app_name})")
+        self.log_to_monitor(f"System | Active App: {display_name}")
+        
+        # Update LCD screen title
+        if hasattr(self, "lcd_text_title"):
+            try:
+                self.canvas.itemconfig(self.lcd_text_title, text=f"APP: {display_name.upper()[:14]}")
+            except Exception:
+                pass
+        
+        # Suggest current app scope in dropdown if not already defined
+        self.after(0, self.update_app_scopes)
+
+    def get_current_mappings(self):
+        if self.selected_app_scope == "Default":
+            return {k: v for k, v in self.active_mappings.items() if k != "app_overrides"}
+        else:
+            overrides = self.active_mappings.setdefault("app_overrides", {})
+            return overrides.setdefault(self.selected_app_scope, {})
+
+    def update_app_scopes(self):
+        scopes = ["Default"]
+        
+        # Add already overridden apps
+        overrides = list(self.active_mappings.get("app_overrides", {}).keys())
+        for app in sorted(overrides):
+            if app not in scopes:
+                scopes.append(app)
+                
+        # Add currently active app
+        if self.active_app_name:
+            display_active = self.get_display_name(self.active_app_name)
+            curr_str = f"Current: {display_active}"
+            if curr_str not in scopes and display_active not in scopes:
+                scopes.append(curr_str)
+                
+        # Add all other installed apps
+        if hasattr(self, 'installed_apps'):
+            for app in sorted(self.installed_apps.keys()):
+                if app not in scopes:
+                    scopes.append(app)
+                    
+        self.app_scope_dropdown.configure(values=scopes)
+        
+        # Set selection safely
+        self.app_scope_dropdown.set(self.selected_app_scope)
+
+    def add_custom_app_scope(self):
+        dialog = ctk.CTkInputDialog(text="Enter the application name (e.g. calculator, spotify):", title="Add App Scope")
+        app_name = dialog.get_input()
+        if app_name:
+            app_name = app_name.strip()
+            if app_name:
+                overrides = self.active_mappings.setdefault("app_overrides", {})
+                if app_name not in overrides:
+                    overrides[app_name] = {}
+                    self.save_config()
+                self.selected_app_scope = app_name
+                self.update_app_scopes()
+                self.app_scope_dropdown.set(app_name)
+                self.load_mappings_list()
+
+    def delete_current_app_scope(self):
+        if self.selected_app_scope == "Default":
+            messagebox.showwarning("Warning", "Cannot delete the default scope.")
+            return
+            
+        if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete all overrides for '{self.selected_app_scope}'?"):
+            overrides = self.active_mappings.get("app_overrides", {})
+            if self.selected_app_scope in overrides:
+                del overrides[self.selected_app_scope]
+                self.save_config()
+            self.selected_app_scope = "Default"
+            self.update_app_scopes()
+            self.app_scope_dropdown.set("Default")
+            self.load_mappings_list()
+            self.clear_mapping_form()
+
+    def change_app_scope(self, val):
+        if val.startswith("Current: "):
+            val = val.replace("Current: ", "")
+            
+        if val != "Default":
+            overrides = self.active_mappings.setdefault("app_overrides", {})
+            if val not in overrides:
+                overrides[val] = {}
+                self.save_config()
+                
+        self.selected_app_scope = val
+        self.update_app_scopes()
+        self.app_scope_dropdown.set(val)
+        self.load_mappings_list()
+        self.clear_mapping_form()
 
     def check_signals(self):
         """Allows Python interpreter to process Ctrl-C signals while running Tkinter mainloop."""

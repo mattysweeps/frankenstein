@@ -69,7 +69,16 @@
         "params": {
           "cmd": "bash /home/mattysweeps/.frankenstein/scripts/Presentation_Mode_note_36.sh"
         }
+      },
+      "app_overrides": {
+        "gnome-shell": {},
+        "Disks": {},
+        "Disk Usage Analyzer": {},
+        "Disk Image Writer": {},
+        "Disk Image Mounter": {},
+        "Google Chrome": {}
       }
     }
-  }
+  },
+  "hardware_preset": "Preset 1: DAW"
 }

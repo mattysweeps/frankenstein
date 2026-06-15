@@ -16,6 +16,7 @@ class MidiManager:
         
         # Dictionary of active ports: {port_name: port_object}
         self.open_ports = {}
+        self.open_outputs = {}
         self.ports_lock = threading.Lock()
         
         self._stop_event = threading.Event()
@@ -47,6 +48,15 @@ class MidiManager:
                 except Exception as e:
                     logger.error(f"Error closing port {name}: {e}")
             self.open_ports.clear()
+            
+            for name, port in list(self.open_outputs.items()):
+                logger.info(f"Closing output port: {name}")
+                try:
+                    port.close()
+                except Exception as e:
+                    logger.error(f"Error closing output port {name}: {e}")
+            self.open_outputs.clear()
+            
             self.is_connected = False
 
     def enable_midi_learn(self, callback):
@@ -64,6 +74,16 @@ class MidiManager:
         with self._learn_lock:
             self._learn_callback = None
 
+    def send_midi_message(self, msg):
+        """Sends a MIDI message to all open output ports."""
+        with self.ports_lock:
+            for name, port in self.open_outputs.items():
+                try:
+                    logger.debug(f"Sending MIDI message to output port {name}: {msg}")
+                    port.send(msg)
+                except Exception as e:
+                    logger.error(f"Error sending MIDI message to output port {name}: {e}")
+
     def _monitor_loop(self):
         """Background thread loop to dynamically detect, open, and close MIDI ports."""
         logger.info("Entering MidiManager monitor loop")
@@ -76,8 +96,17 @@ class MidiManager:
                 logger.error(f"Error querying MIDI inputs: {e}", exc_info=True)
                 all_inputs = []
 
+            try:
+                # Get all available system MIDI output port names
+                all_outputs = mido.get_output_names()
+                logger.debug(f"Discovered MIDI outputs on system: {all_outputs}")
+            except Exception as e:
+                logger.error(f"Error querying MIDI outputs: {e}", exc_info=True)
+                all_outputs = []
+
             # Filter for ports belonging to the MPK249
             target_ports = [name for name in all_inputs if any(term in name.lower() for term in ["mpk249", "akai"])]
+            target_outputs = [name for name in all_outputs if any(term in name.lower() for term in ["mpk249", "akai"])]
             
             with self.ports_lock:
                 # 1. Close ports that are no longer connected
@@ -105,8 +134,29 @@ class MidiManager:
                         except Exception as e:
                             logger.error(f"Error opening port {name}: {e}", exc_info=True)
 
-                # 3. Update connection status
-                has_ports = len(self.open_ports) > 0
+                # 3. Close outputs that are no longer connected
+                for name in list(self.open_outputs.keys()):
+                    if name not in target_outputs:
+                        logger.warning(f"Output port disconnected: {name}")
+                        try:
+                            self.open_outputs[name].close()
+                        except Exception as e:
+                            logger.error(f"Error closing stale output port {name}: {e}")
+                        del self.open_outputs[name]
+
+                # 4. Open new outputs
+                for name in target_outputs:
+                    if name not in self.open_outputs:
+                        logger.info(f"Attempting to open output port: {name}")
+                        try:
+                            port = mido.open_output(name)
+                            self.open_outputs[name] = port
+                            logger.info(f"Successfully opened output port: {name}")
+                        except Exception as e:
+                            logger.error(f"Error opening output port {name}: {e}", exc_info=True)
+
+                # 5. Update connection status
+                has_ports = len(self.open_ports) > 0 or len(self.open_outputs) > 0
                 if has_ports != self.is_connected:
                     self.is_connected = has_ports
                     logger.info(f"Connection status changed. Connected: {self.is_connected}")
@@ -137,7 +187,15 @@ class MidiManager:
                 val = msg.pitch
             elif msg.type == 'program_change':
                 control_id = f"program:{msg.program}"
+                val = getattr(msg, 'program', 127)
+            elif msg.type == 'sysex':
+                # Represent SysEx data as a hex string (excluding F0 and F7, which mido.Message.data already does)
+                data_hex = msg.data.hex() if hasattr(msg.data, 'hex') else ''.join(f'{b:02x}' for b in msg.data)
+                control_id = f"sysex:{data_hex}"
                 val = 127
+            elif msg.type in ['start', 'stop', 'continue', 'songposition', 'songselect', 'tune_request', 'clock', 'reset']:
+                control_id = f"system:{msg.type}"
+                val = getattr(msg, 'pos', getattr(msg, 'song', 127))
                 
             if not control_id:
                 return
